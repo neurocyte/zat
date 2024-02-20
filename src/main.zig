@@ -103,6 +103,7 @@ fn render_file(a: std.mem.Allocator, writer: anytype, content: []const u8, file_
     };
     var ctx: Ctx = .{ .writer = writer, .content = content, .theme = theme };
     try parser.render(&ctx, Ctx.cb);
+    try ctx.writer.writeAll(content[ctx.last_pos..]);
 }
 
 fn style_cache_lookup(theme: *const Theme, scope: []const u8, id: u32) ?Theme.Token {
