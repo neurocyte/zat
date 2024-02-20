@@ -16,7 +16,7 @@ Run with:
 zig-out/bin/zat
 ```
 
-Place it in your path for convinient access.
+Place it in your path for convenient access.
 
 
 Supply files to highlight on the command line. Multiple files will be appended
