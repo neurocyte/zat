@@ -74,11 +74,18 @@ pub fn main() !void {
     try bw.flush();
 }
 
-fn render_file(a: std.mem.Allocator, writer: anytype, content: []const u8, file_path: []const u8, theme: *const Theme) !void {
-    const parser = if (lang_override) |name|
-        try syntax.create_file_type(a, content, name)
+fn get_parser(a: std.mem.Allocator, content: []const u8, file_path: []const u8) *syntax {
+    return (if (lang_override) |name|
+        syntax.create_file_type(a, content, name)
     else
-        try syntax.create_guess_file_type(a, content, file_path);
+        syntax.create_guess_file_type(a, content, file_path)) catch {
+        std.io.getStdErr().writer().writeAll("unknown file type. override with --lang\n") catch {};
+        std.os.exit(1);
+    };
+}
+
+fn render_file(a: std.mem.Allocator, writer: anytype, content: []const u8, file_path: []const u8, theme: *const Theme) !void {
+    const parser = get_parser(a, content, file_path);
 
     const Ctx = struct {
         writer: @TypeOf(writer),
