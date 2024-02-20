@@ -6,7 +6,17 @@ ARCH=$(uname -m)
 BASEDIR="$(cd "$(dirname "$0")" && pwd)"
 ZIGDIR=$BASEDIR/.cache/zig
 VERSION=$(< build.zig.version)
-ZIGVER="zig-linux-$ARCH-$VERSION"
+
+OS=$(uname)
+
+if [ "$OS" == "Linux" ] ; then
+	OS=linux
+elif [ "$OS" == "Darwin" ] ; then
+	OS=macos
+fi
+
+
+ZIGVER="zig-$OS-$ARCH-$VERSION"
 ZIG=$ZIGDIR/$ZIGVER/zig
 
 if [ "$1" == "update" ] ; then
