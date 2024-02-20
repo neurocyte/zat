@@ -5,7 +5,7 @@ It uses tree-sitter and supports for vscode themes.
 
 Build with the provided zig wrapper:
 ```shell
-./zig build -Doptimize=ReleaseFast
+./zig build -Doptimize=ReleaseSmall
 ```
 
 The zig wrapper just fetches a known good version of zig nightly and places it
@@ -16,7 +16,7 @@ Run with:
 zig-out/bin/zat
 ```
 
-Place it in your path for convinient access. You might want to strip it first.
+Place it in your path for convinient access.
 
 
 Supply files to highlight on the command line. Multiple files will be appended
