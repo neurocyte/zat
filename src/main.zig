@@ -206,8 +206,16 @@ fn get_theme_by_name(name: []const u8) ?Theme {
 }
 
 fn list_themes(writer: anytype) !void {
+    var max_name_len: usize = 0;
     for (themes.themes) |theme|
-        try writer.print("{s}\t{s}\n", .{ theme.name, theme.description });
+        max_name_len = @max(max_name_len, theme.name.len);
+
+    for (themes.themes) |theme| {
+        try writer.writeAll(theme.name);
+        try writer.writeByteNTimes(' ', max_name_len + 2 - theme.name.len);
+        try writer.writeAll(theme.description);
+        try writer.writeAll("\n");
+    }
 }
 
 fn set_ansi_style(writer: anytype, style: Theme.Style) !void {
