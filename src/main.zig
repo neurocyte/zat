@@ -86,22 +86,24 @@ fn render_file(a: std.mem.Allocator, writer: anytype, content: []const u8, file_
         theme: *const Theme,
         last_pos: usize = 0,
         fn cb(ctx: *@This(), range: syntax.Range, scope: []const u8, id: u32, idx: usize) error{Stop}!void {
-            defer ctx.last_pos = range.end_byte;
-
             if (idx > 0) return;
 
-            if (ctx.last_pos < range.start_byte)
+            if (ctx.last_pos < range.start_byte) {
                 ctx.writer.writeAll(ctx.content[ctx.last_pos..range.start_byte]) catch return error.Stop;
-
+                ctx.last_pos = range.start_byte;
+            }
             if (range.start_byte < ctx.last_pos) return;
 
             const style_ = style_cache_lookup(ctx.theme, scope, id);
             const style = if (style_) |sty| sty.style else {
                 ctx.writer.writeAll(ctx.content[range.start_byte..range.end_byte]) catch return error.Stop;
+                ctx.last_pos = range.end_byte;
                 return;
             };
             set_ansi_style(ctx.writer, style) catch return error.Stop;
             ctx.writer.writeAll(ctx.content[range.start_byte..range.end_byte]) catch return error.Stop;
+            ctx.last_pos = range.end_byte;
+            set_ansi_style(ctx.writer, Theme.Style{}) catch return error.Stop;
         }
     };
     var ctx: Ctx = .{ .writer = writer, .content = content, .theme = theme };
