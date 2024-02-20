@@ -4,6 +4,7 @@ const syntax = @import("syntax");
 const Theme = @import("theme");
 const themes = @import("themes");
 const term = @import("ansi-term.zig");
+const config_loader = @import("config_loader.zig");
 
 const StyleCache = std.AutoHashMap(u32, ?Theme.Token);
 var style_cache: StyleCache = undefined;
@@ -41,7 +42,9 @@ pub fn main() !void {
     if (res.args.@"list-themes" != 0)
         return list_themes(std.io.getStdOut().writer());
 
-    const theme_name = if (res.args.theme) |theme| theme else "default";
+    var conf_buf: ?[]const u8 = null;
+    const conf = config_loader.read_config(a, &conf_buf);
+    const theme_name = if (res.args.theme) |theme| theme else conf.theme;
 
     const theme = get_theme_by_name(theme_name) orelse {
         try std.io.getStdErr().writer().print("theme \"{s}\" not found\n", .{theme_name});
