@@ -1,2 +1,9 @@
 # zat
-zat is a syntax highlighting cat like utility using tree-sitter and with support for vscode themes
+zat is a syntax highlighting cat like utility.
+
+It uses tree-sitter and supports for vscode themes.
+
+Build with:
+```shell
+./zig build
+```
