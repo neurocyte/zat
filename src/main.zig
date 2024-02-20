@@ -13,9 +13,10 @@ var lang_override: ?[]const u8 = null;
 pub fn main() !void {
     const params = comptime clap.parseParamsComptime(
         \\-h, --help               Display this help and exit.
-        \\-l, --lang <str>         Override the language.
+        \\-l, --language <str>     Override the language.
         \\-t, --theme <str>        Select theme to use.
         \\--list-themes            Show available themes.
+        \\--list-languages         Show available language parsers.
         \\<str>...                 File to open.
         \\
     );
@@ -42,6 +43,9 @@ pub fn main() !void {
     if (res.args.@"list-themes" != 0)
         return list_themes(std.io.getStdOut().writer());
 
+    if (res.args.@"list-languages" != 0)
+        return list_langs(std.io.getStdOut().writer());
+
     var conf_buf: ?[]const u8 = null;
     const conf = config_loader.read_config(a, &conf_buf);
     const theme_name = if (res.args.theme) |theme| theme else conf.theme;
@@ -51,7 +55,7 @@ pub fn main() !void {
         std.os.exit(1);
     };
 
-    lang_override = res.args.lang;
+    lang_override = res.args.language;
 
     const stdout_file = std.io.getStdOut().writer();
     var bw = std.io.bufferedWriter(stdout_file);
@@ -238,4 +242,11 @@ fn to_rgb_color(color: u24) term.style.Color {
     const g = @as(u8, @intCast(color >> 8 & 0xFF));
     const b = @as(u8, @intCast(color & 0xFF));
     return .{ .RGB = .{ .r = r, .g = g, .b = b } };
+}
+
+fn list_langs(writer: anytype) !void {
+    for (syntax.FileType.file_types) |file_type| {
+        try writer.writeAll(file_type.name);
+        try writer.writeAll("\n");
+    }
 }

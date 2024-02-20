@@ -21,7 +21,7 @@ Place it in your path for convinient access. You might want to strip it first.
 
 Supply files to highlight on the command line. Multiple files will be appended
 like with cat. If no files are on the command line zat will read from stdin.
-Override the language with --lang and select a different theme with --theme.
+Override the language with --language and select a different theme with --theme.
 The default theme will be read from ~/.config/flow/config.json if found.
 
 See --help for full command line.

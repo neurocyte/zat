@@ -103,7 +103,7 @@ fn DeclLang(comptime lang: []const u8, comptime args: FileTypeOptions) FileType 
     };
 }
 
-const file_types = load_file_types(@import("file_types.zig"));
+pub const file_types = load_file_types(@import("file_types.zig"));
 
 fn load_file_types(comptime Namespace: type) []FileType {
     comptime switch (@typeInfo(Namespace)) {
