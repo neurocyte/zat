@@ -3,7 +3,21 @@ zat is a syntax highlighting cat like utility.
 
 It uses tree-sitter and supports for vscode themes.
 
-Build with:
+Build with the provided zig wrapper:
 ```shell
-./zig build
+./zig build -Doptimize=ReleaseFast
 ```
+
+The zig wrapper just fetches a known good version of zig nightly and places it in the .cache directory. Or use your own version of zig.
+
+Run with:
+```shell
+zig-out/bin/zat
+```
+
+Place it in your path for convinient access. You might want to strip it first.
+
+
+Supply files to highlight on the command line. Multiple files will be appended like with cat. If no files are on the command line zat will read from stdin. Override the language with --lang and select a different theme with --theme.
+
+See --help for full command line.

@@ -12,6 +12,13 @@ injections: ?[:0]const u8,
 first_line_matches: ?FirstLineMatch = null,
 comment: []const u8,
 
+pub fn get_by_name(name: []const u8) ?*const FileType {
+    for (file_types) |*file_type|
+        if (std.mem.eql(u8, file_type.name, name))
+            return file_type;
+    return null;
+}
+
 pub fn guess(file_path: ?[]const u8, content: []const u8) ?*const FileType {
     if (guess_first_line(content)) |ft| return ft;
     for (file_types) |*file_type|

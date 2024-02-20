@@ -7,10 +7,14 @@ const term = @import("ansi-term.zig");
 
 const StyleCache = std.AutoHashMap(u32, ?Theme.Token);
 var style_cache: StyleCache = undefined;
+var lang_override: ?[]const u8 = null;
 
 pub fn main() !void {
     const params = comptime clap.parseParamsComptime(
         \\-h, --help               Display this help and exit.
+        \\-l, --lang <str>         Override the language.
+        \\-t, --theme <str>        Select theme to use.
+        \\--list-themes            Show available themes.
         \\<str>...                 File to open.
         \\
     );
@@ -34,7 +38,17 @@ pub fn main() !void {
     if (res.args.help != 0)
         return clap.help(std.io.getStdErr().writer(), clap.Help, &params, .{});
 
-    const theme = get_theme_by_name("default") orelse unreachable;
+    if (res.args.@"list-themes" != 0)
+        return list_themes(std.io.getStdOut().writer());
+
+    const theme_name = if (res.args.theme) |theme| theme else "default";
+
+    const theme = get_theme_by_name(theme_name) orelse {
+        try std.io.getStdErr().writer().print("theme \"{s}\" not found\n", .{theme_name});
+        std.os.exit(1);
+    };
+
+    lang_override = res.args.lang;
 
     const stdout_file = std.io.getStdOut().writer();
     var bw = std.io.bufferedWriter(stdout_file);
@@ -58,7 +72,10 @@ pub fn main() !void {
 }
 
 fn render_file(a: std.mem.Allocator, writer: anytype, content: []const u8, file_path: []const u8, theme: *const Theme) !void {
-    const parser = try syntax.create_guess_file_type(a, content, file_path);
+    const parser = if (lang_override) |name|
+        try syntax.create_file_type(a, content, name)
+    else
+        try syntax.create_guess_file_type(a, content, file_path);
 
     const Ctx = struct {
         writer: @TypeOf(writer),
@@ -173,6 +190,11 @@ fn get_theme_by_name(name: []const u8) ?Theme {
             return theme;
     }
     return null;
+}
+
+fn list_themes(writer: anytype) !void {
+    for (themes.themes) |theme|
+        try writer.print("{s}\t{s}\n", .{ theme.name, theme.description });
 }
 
 fn set_ansi_style(writer: anytype, style: Theme.Style) !void {

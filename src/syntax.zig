@@ -33,6 +33,11 @@ pub fn create(file_type: *const FileType, a: std.mem.Allocator, content: []const
     return self;
 }
 
+pub fn create_file_type(a: std.mem.Allocator, content: []const u8, lang_name: []const u8) !*Self {
+    const file_type = FileType.get_by_name(lang_name) orelse return error.NotFound;
+    return create(file_type, a, content);
+}
+
 pub fn create_guess_file_type(a: std.mem.Allocator, content: []const u8, file_path: ?[]const u8) !*Self {
     const file_type = FileType.guess(file_path, content) orelse return error.NotFound;
     return create(file_type, a, content);
