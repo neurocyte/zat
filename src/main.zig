@@ -96,8 +96,7 @@ fn unknown_file_type(name: []const u8) noreturn {
 
 fn render_file(a: std.mem.Allocator, writer: anytype, content: []const u8, file_path: []const u8, theme: *const Theme, show: bool) !void {
     const parser = get_parser(a, content, file_path);
-    if (show)
-        std.io.getStdOut().writer().print("File type: {s}\n", .{parser.file_type.name}) catch {};
+    if (show) try render_file_type(writer, parser.file_type, theme);
 
     const Ctx = struct {
         writer: @TypeOf(writer),
@@ -113,16 +112,15 @@ fn render_file(a: std.mem.Allocator, writer: anytype, content: []const u8, file_
             }
             if (range.start_byte < ctx.last_pos) return;
 
-            const style_ = style_cache_lookup(ctx.theme, scope, id);
-            const style = if (style_) |sty| sty.style else {
+            const plain: Theme.Style = Theme.Style{ .fg = ctx.theme.editor.fg };
+            if (style_cache_lookup(ctx.theme, scope, id)) |token| {
+                set_ansi_style(ctx.writer, token.style, plain) catch return error.Stop;
                 ctx.writer.writeAll(ctx.content[range.start_byte..range.end_byte]) catch return error.Stop;
-                ctx.last_pos = range.end_byte;
-                return;
-            };
-            set_ansi_style(ctx.writer, style) catch return error.Stop;
-            ctx.writer.writeAll(ctx.content[range.start_byte..range.end_byte]) catch return error.Stop;
+                set_ansi_style(ctx.writer, plain, plain) catch return error.Stop;
+            } else {
+                ctx.writer.writeAll(ctx.content[range.start_byte..range.end_byte]) catch return error.Stop;
+            }
             ctx.last_pos = range.end_byte;
-            set_ansi_style(ctx.writer, Theme.Style{}) catch return error.Stop;
         }
     };
     var ctx: Ctx = .{ .writer = writer, .content = content, .theme = theme };
@@ -230,10 +228,10 @@ fn list_themes(writer: anytype) !void {
     }
 }
 
-fn set_ansi_style(writer: anytype, style: Theme.Style) !void {
+fn set_ansi_style(writer: anytype, style: Theme.Style, fallback: Theme.Style) !void {
     const ansi_style = .{
-        .foreground = if (style.fg) |color| to_rgb_color(color) else .Default,
-        .background = if (style.bg) |color| to_rgb_color(color) else .Default,
+        .foreground = if (style.fg) |color| to_rgb_color(color) else if (fallback.fg) |color| to_rgb_color(color) else .Default,
+        .background = if (style.bg) |color| to_rgb_color(color) else if (fallback.bg) |color| to_rgb_color(color) else .Default,
         .font_style = switch (style.fs orelse .normal) {
             .normal => term.style.FontStyle{},
             .bold => term.style.FontStyle.bold,
@@ -257,4 +255,24 @@ fn list_langs(writer: anytype) !void {
         try writer.writeAll(file_type.name);
         try writer.writeAll("\n");
     }
+}
+
+fn render_file_type(writer: anytype, file_type: *const syntax.FileType, theme: *const Theme) !void {
+    const style = theme.editor_selection;
+    const reversed = Theme.Style{ .fg = theme.editor_selection.bg };
+    const plain: Theme.Style = Theme.Style{ .fg = theme.editor.fg };
+    try set_ansi_style(writer, reversed, plain);
+    try writer.writeAll("");
+    try set_ansi_style(writer, .{
+        .fg = if (file_type.color == 0xFFFFFF or file_type.color == 0x000000) style.fg else file_type.color,
+        .bg = style.bg,
+    }, plain);
+    try writer.writeAll(file_type.icon);
+    try writer.writeAll(" ");
+    try set_ansi_style(writer, style, plain);
+    try writer.writeAll(file_type.name);
+    try set_ansi_style(writer, reversed, plain);
+    try writer.writeAll("");
+    try set_ansi_style(writer, plain, plain);
+    try writer.writeAll("\n");
 }
