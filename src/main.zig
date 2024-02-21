@@ -71,13 +71,19 @@ pub fn main() !void {
             defer file.close();
             const content = try file.readToEndAlloc(a, std.math.maxInt(u32));
             defer a.free(content);
-            try render_file(a, writer, content, arg, &theme, res.args.@"show-language" != 0);
+            render_file(a, writer, content, arg, &theme, res.args.@"show-language" != 0) catch |e| switch (e) {
+                error.Stop => return,
+                else => return e,
+            };
             try bw.flush();
         }
     } else {
         const content = try std.io.getStdIn().readToEndAlloc(a, std.math.maxInt(u32));
         defer a.free(content);
-        try render_file(a, writer, content, "-", &theme, res.args.@"show-language" != 0);
+        render_file(a, writer, content, "-", &theme, res.args.@"show-language" != 0) catch |e| switch (e) {
+            error.Stop => return,
+            else => return e,
+        };
     }
     try bw.flush();
 }
