@@ -17,6 +17,7 @@ pub fn main() !void {
         \\-l, --language <str>     Override the language.
         \\-t, --theme <str>        Select theme to use.
         \\-d, --default <str>      Set the language to use if guessing failed (default: conf).
+        \\-s, --show-language      Show detected language in output.
         \\--list-themes            Show available themes.
         \\--list-languages         Show available language parsers.
         \\<str>...                 File to open.
@@ -70,13 +71,13 @@ pub fn main() !void {
             defer file.close();
             const content = try file.readToEndAlloc(a, std.math.maxInt(u32));
             defer a.free(content);
-            try render_file(a, writer, content, arg, &theme);
+            try render_file(a, writer, content, arg, &theme, res.args.@"show-language" != 0);
             try bw.flush();
         }
     } else {
         const content = try std.io.getStdIn().readToEndAlloc(a, std.math.maxInt(u32));
         defer a.free(content);
-        try render_file(a, writer, content, "-", &theme);
+        try render_file(a, writer, content, "-", &theme, res.args.@"show-language" != 0);
     }
     try bw.flush();
 }
@@ -93,8 +94,10 @@ fn unknown_file_type(name: []const u8) noreturn {
     std.os.exit(1);
 }
 
-fn render_file(a: std.mem.Allocator, writer: anytype, content: []const u8, file_path: []const u8, theme: *const Theme) !void {
+fn render_file(a: std.mem.Allocator, writer: anytype, content: []const u8, file_path: []const u8, theme: *const Theme, show: bool) !void {
     const parser = get_parser(a, content, file_path);
+    if (show)
+        std.io.getStdOut().writer().print("File type: {s}\n", .{parser.file_type.name}) catch {};
 
     const Ctx = struct {
         writer: @TypeOf(writer),
