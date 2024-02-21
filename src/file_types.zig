@@ -8,7 +8,7 @@ pub const bash = .{
     .icon = "󱆃",
     .extensions = &[_][]const u8{ "sh", "bash" },
     .comment = "#",
-    .first_line_matches = .{ .prefix = "#!", .content = "/bin/bash" },
+    .first_line_matches = .{ .prefix = "#!", .content = "bash" },
 };
 
 pub const c = .{
@@ -49,7 +49,7 @@ pub const css = .{
 };
 
 pub const diff = .{
-    .extensions = &[_][]const u8{"diff"},
+    .extensions = &[_][]const u8{ "diff", "patch" },
     .comment = "#",
 };
 
@@ -232,7 +232,7 @@ pub const rust = .{
 };
 
 pub const scheme = .{
-    .extensions = &[_][]const u8{ "scm", "ss" },
+    .extensions = &[_][]const u8{ "scm", "ss", "el" },
     .comment = ";",
 };
 
