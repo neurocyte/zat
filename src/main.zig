@@ -9,12 +9,14 @@ const config_loader = @import("config_loader.zig");
 const StyleCache = std.AutoHashMap(u32, ?Theme.Token);
 var style_cache: StyleCache = undefined;
 var lang_override: ?[]const u8 = null;
+var lang_default: []const u8 = "conf";
 
 pub fn main() !void {
     const params = comptime clap.parseParamsComptime(
         \\-h, --help               Display this help and exit.
         \\-l, --language <str>     Override the language.
         \\-t, --theme <str>        Select theme to use.
+        \\-d, --default <str>      Set the language to use if guessing failed (default: conf).
         \\--list-themes            Show available themes.
         \\--list-languages         Show available language parsers.
         \\<str>...                 File to open.
@@ -56,6 +58,7 @@ pub fn main() !void {
     };
 
     lang_override = res.args.language;
+    if (res.args.default) |default| lang_default = default;
 
     const stdout_file = std.io.getStdOut().writer();
     var bw = std.io.bufferedWriter(stdout_file);
@@ -80,12 +83,14 @@ pub fn main() !void {
 
 fn get_parser(a: std.mem.Allocator, content: []const u8, file_path: []const u8) *syntax {
     return (if (lang_override) |name|
-        syntax.create_file_type(a, content, name)
+        syntax.create_file_type(a, content, name) catch unknown_file_type(name)
     else
-        syntax.create_guess_file_type(a, content, file_path)) catch {
-        std.io.getStdErr().writer().writeAll("unknown file type. override with --lang\n") catch {};
-        std.os.exit(1);
-    };
+        syntax.create_guess_file_type(a, content, file_path)) catch syntax.create_file_type(a, content, lang_default) catch unknown_file_type(lang_default);
+}
+
+fn unknown_file_type(name: []const u8) noreturn {
+    std.io.getStdErr().writer().print("unknown file type \'{s}\'\n", .{name}) catch {};
+    std.os.exit(1);
 }
 
 fn render_file(a: std.mem.Allocator, writer: anytype, content: []const u8, file_path: []const u8, theme: *const Theme) !void {
