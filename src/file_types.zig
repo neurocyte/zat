@@ -60,6 +60,13 @@ pub const dockerfile = .{
     .comment = "#",
 };
 
+pub const dtd = .{
+    .icon = "󰗀",
+    .extensions = &[_][]const u8{ "dtd" },
+    .comment = "<!--",
+    .highlights = @embedFile("tree-sitter-xml/dtd/queries/highlights.scm"),
+};
+
 pub const fish = .{
     .extensions = &[_][]const u8{"fish"},
     .comment = "#",
@@ -189,6 +196,12 @@ pub const openscad = .{
     .injections = @embedFile("tree-sitter-openscad/queries/injections.scm"),
 };
 
+pub const org = .{
+    .icon = "",
+    .extensions = &[_][]const u8{"org"},
+    .comment = "#",
+};
+
 pub const php = .{
     .color = 0x6181b6,
     .icon = "󰌟",
@@ -251,6 +264,14 @@ pub const typescript = .{
     .icon = "󰛦",
     .extensions = &[_][]const u8{ "ts", "tsx" },
     .comment = "//",
+};
+
+pub const xml = .{
+    .icon = "󰗀",
+    .extensions = &[_][]const u8{ "xml" },
+    .comment = "<!--",
+    .highlights = @embedFile("tree-sitter-xml/xml/queries/highlights.scm"),
+    .first_line_matches = .{ .prefix = "<?xml " },
 };
 
 pub const zig = .{

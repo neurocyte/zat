@@ -39,6 +39,7 @@ pub fn build(b: *std.Build) void {
             file_module(b, tree_sitter_dep, "tree-sitter-nix/queries/highlights.scm"),
             file_module(b, tree_sitter_dep, "tree-sitter-ocaml/queries/highlights.scm"),
             file_module(b, tree_sitter_dep, "tree-sitter-openscad/queries/highlights.scm"),
+            file_module(b, tree_sitter_dep, "tree-sitter-org/queries/highlights.scm"),
             file_module(b, tree_sitter_dep, "tree-sitter-php/queries/highlights.scm"),
             file_module(b, tree_sitter_dep, "tree-sitter-python/queries/highlights.scm"),
             file_module(b, tree_sitter_dep, "tree-sitter-purescript/queries/highlights.scm"),
@@ -50,6 +51,8 @@ pub fn build(b: *std.Build) void {
             file_module(b, tree_sitter_dep, "tree-sitter-scheme/queries/highlights.scm"),
             file_module(b, tree_sitter_dep, "tree-sitter-toml/queries/highlights.scm"),
             file_module(b, tree_sitter_dep, "tree-sitter-typescript/queries/highlights.scm"),
+            file_module(b, tree_sitter_dep, "tree-sitter-xml/dtd/queries/highlights.scm"),
+            file_module(b, tree_sitter_dep, "tree-sitter-xml/xml/queries/highlights.scm"),
             file_module(b, tree_sitter_dep, "tree-sitter-zig/queries/highlights.scm"),
 
             file_module(b, tree_sitter_dep, "tree-sitter-cpp/queries/injections.scm"),
