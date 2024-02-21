@@ -27,7 +27,7 @@ pub const @"c-sharp" = .{
 pub const conf = .{
     .color = 0x000000,
     .icon = "",
-    .extensions = &[_][]const u8{ "conf", "config" },
+    .extensions = &[_][]const u8{ "conf", "config", ".gitconfig" },
     .highlights = fish.highlights,
     .comment = "#",
     .parser = fish.parser,
@@ -257,7 +257,7 @@ pub const @"ssh-config" = .{
 };
 
 pub const toml = .{
-    .extensions = &[_][]const u8{"toml"},
+    .extensions = &[_][]const u8{ "toml" },
     .comment = "#",
 };
 

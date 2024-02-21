@@ -1,20 +1,24 @@
 const std = @import("std");
-const ts = @import("tree-sitter");
+const treez = @import("treez");
 
 const Self = @This();
 
-pub const Edit = ts.InputEdit;
+pub const Edit = treez.InputEdit;
 pub const FileType = @import("file_type.zig");
-pub const Range = ts.Range;
+pub const Range = treez.Range;
+pub const Point = treez.Point;
+const Language = treez.Language;
+const Parser = treez.Parser;
+const Query = treez.Query;
+const Tree = treez.Tree;
 
 a: std.mem.Allocator,
-lang: *const ts.Language,
+lang: *const Language,
 file_type: *const FileType,
-parser: *ts.Parser,
-query: *ts.Query,
-injections: *ts.Query,
-tree: ?*ts.Tree = null,
-content: []const u8,
+parser: *Parser,
+query: *Query,
+injections: *Query,
+tree: ?*Tree = null,
 
 pub fn create(file_type: *const FileType, a: std.mem.Allocator, content: []const u8) !*Self {
     const self = try a.create(Self);
@@ -22,14 +26,13 @@ pub fn create(file_type: *const FileType, a: std.mem.Allocator, content: []const
         .a = a,
         .lang = file_type.lang_fn() orelse std.debug.panic("tree-sitter parser function failed for language: {d}", .{file_type.name}),
         .file_type = file_type,
-        .parser = try ts.Parser.create(),
-        .query = try ts.Query.create(self.lang, file_type.highlights),
-        .injections = try ts.Query.create(self.lang, file_type.highlights),
-        .content = content,
+        .parser = try Parser.create(),
+        .query = try Query.create(self.lang, file_type.highlights),
+        .injections = try Query.create(self.lang, file_type.highlights),
     };
     errdefer self.destroy();
     try self.parser.setLanguage(self.lang);
-    try self.parse();
+    try self.parse(content);
     return self;
 }
 
@@ -50,27 +53,60 @@ pub fn destroy(self: *Self) void {
     self.a.destroy(self);
 }
 
-fn parse(self: *Self) !void {
+fn parse(self: *Self, content: []const u8) !void {
     if (self.tree) |tree| tree.destroy();
-    self.tree = try self.parser.parseString(null, self.content);
+    self.tree = try self.parser.parseString(null, content);
+}
+
+pub fn refresh_full(self: *Self, content: []const u8) !void {
+    return self.parse(content);
+}
+
+pub fn edit(self: *Self, ed: Edit) void {
+    if (self.tree) |tree| tree.edit(&ed);
+}
+
+pub fn refresh(self: *Self, content: []const u8) !void {
+    const old_tree = self.tree;
+    defer if (old_tree) |tree| tree.destroy();
+    self.tree = try self.parser.parseString(old_tree, content);
 }
 
 fn CallBack(comptime T: type) type {
-    return fn (ctx: T, sel: Range, scope: []const u8, id: u32, idx: usize) error{Stop}!void;
+    return fn (ctx: T, sel: Range, scope: []const u8, id: u32, capture_idx: usize) error{Stop}!void;
 }
 
-pub fn render(self: *const Self, ctx: anytype, comptime cb: CallBack(@TypeOf(ctx))) !void {
-    const cursor = try ts.Query.Cursor.create();
+pub fn render(self: *const Self, ctx: anytype, comptime cb: CallBack(@TypeOf(ctx)), range: ?Range) !void {
+    const cursor = try Query.Cursor.create();
     defer cursor.destroy();
     const tree = if (self.tree) |p| p else return;
     cursor.execute(self.query, tree.getRootNode());
+    if (range) |r| cursor.setPointRange(r.start_point, r.end_point);
     while (cursor.nextMatch()) |match| {
         var idx: usize = 0;
         for (match.captures()) |capture| {
-            const range = capture.node.getRange();
-            const scope = self.query.getCaptureNameForId(capture.id);
-            try cb(ctx, range, scope, capture.id, idx);
+            try cb(ctx, capture.node.getRange(), self.query.getCaptureNameForId(capture.id), capture.id, idx);
             idx += 1;
         }
     }
+}
+
+pub fn highlights_at_point(self: *const Self, ctx: anytype, comptime cb: CallBack(@TypeOf(ctx)), point: Point) void {
+    const cursor = Query.Cursor.create() catch return;
+    defer cursor.destroy();
+    const tree = if (self.tree) |p| p else return;
+    cursor.execute(self.query, tree.getRootNode());
+    cursor.setPointRange(.{ .row = point.row, .column = 0 }, .{ .row = point.row + 1, .column = 0 });
+    while (cursor.nextMatch()) |match| {
+        for (match.captures()) |capture| {
+            const range = capture.node.getRange();
+            const start = range.start_point;
+            const end = range.end_point;
+            const scope = self.query.getCaptureNameForId(capture.id);
+            if (start.row == point.row and start.row <= point.column and point.column < end.column)
+                cb(ctx, range, scope, capture.id, 0) catch return;
+            break;
+        }
+    }
+    return;
 }

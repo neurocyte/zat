@@ -11,7 +11,7 @@ pub fn build(b: *std.Build) void {
     const syntax_mod = b.createModule(.{
         .root_source_file = .{ .path = "src/syntax.zig" },
         .imports = &.{
-            .{ .name = "tree-sitter", .module = tree_sitter_dep.module("tree-sitter") },
+            .{ .name = "treez", .module = tree_sitter_dep.module("treez") },
             file_module(b, tree_sitter_dep, "tree-sitter-agda/queries/highlights.scm"),
             file_module(b, tree_sitter_dep, "tree-sitter-bash/queries/highlights.scm"),
             file_module(b, tree_sitter_dep, "tree-sitter-c-sharp/queries/highlights.scm"),

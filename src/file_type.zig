@@ -1,5 +1,5 @@
 const std = @import("std");
-const ts = @import("tree-sitter");
+const treez = @import("treez");
 pub const FileType = @This();
 
 color: u24,
@@ -72,7 +72,7 @@ fn ft_func_name(comptime lang: []const u8) []const u8 {
     return &func_name;
 }
 
-const LangFn = *const fn () callconv(.C) ?*const ts.Language;
+const LangFn = *const fn () callconv(.C) ?*const treez.Language;
 
 const FirstLineMatch = struct {
     prefix: ?[]const u8 = null,
