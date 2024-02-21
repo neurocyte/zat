@@ -8,7 +8,7 @@ pub const bash = .{
     .icon = "󱆃",
     .extensions = &[_][]const u8{ "sh", "bash" },
     .comment = "#",
-    .first_line_matches = .{ .prefix = "#!", .content = "bash" },
+    .first_line_matches = .{ .prefix = "#!", .content = "sh" },
 };
 
 pub const c = .{
@@ -62,7 +62,7 @@ pub const dockerfile = .{
 
 pub const dtd = .{
     .icon = "󰗀",
-    .extensions = &[_][]const u8{ "dtd" },
+    .extensions = &[_][]const u8{"dtd"},
     .comment = "<!--",
     .highlights = @embedFile("tree-sitter-xml/dtd/queries/highlights.scm"),
 };
@@ -137,6 +137,7 @@ pub const lua = .{
     .extensions = &[_][]const u8{"lua"},
     .comment = "--",
     .injections = @embedFile("tree-sitter-lua/queries/injections.scm"),
+    .first_line_matches = .{ .prefix = "--", .content = "lua" },
 };
 
 pub const make = .{
@@ -210,6 +211,7 @@ pub const php = .{
     .injections = @embedFile("tree-sitter-php/queries/injections.scm"),
 };
 
+// conflicts with haskell
 // pub const purescript = .{
 //     .extensions = &[_][]const u8{"purs"},
 //     .comment = "--",
@@ -268,7 +270,7 @@ pub const typescript = .{
 
 pub const xml = .{
     .icon = "󰗀",
-    .extensions = &[_][]const u8{ "xml" },
+    .extensions = &[_][]const u8{"xml"},
     .comment = "<!--",
     .highlights = @embedFile("tree-sitter-xml/xml/queries/highlights.scm"),
     .first_line_matches = .{ .prefix = "<?xml " },

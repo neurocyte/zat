@@ -100,6 +100,7 @@ fn DeclLang(comptime lang: []const u8, comptime args: FileTypeOptions) FileType 
         .comment = args.comment,
         .highlights = if (args.highlights) |h| h else @embedFile("tree-sitter-" ++ lang ++ "/queries/highlights.scm"),
         .injections = args.injections,
+        .first_line_matches = args.first_line_matches,
     };
 }
 
