@@ -283,3 +283,11 @@ pub const zig = .{
     .comment = "//",
     .injections = @embedFile("tree-sitter-zig/queries/injections.scm"),
 };
+
+pub const ziggy = .{
+    .color = 0xf7a41d,
+    .icon = "",
+    .extensions = &[_][]const u8{ "ziggy" },
+    .comment = "//",
+    .highlights = @embedFile("tree-sitter-ziggy/tree-sitter-ziggy/queries/highlights.scm"),
+};

@@ -54,6 +54,7 @@ pub fn build(b: *std.Build) void {
             file_module(b, tree_sitter_dep, "tree-sitter-xml/dtd/queries/highlights.scm"),
             file_module(b, tree_sitter_dep, "tree-sitter-xml/xml/queries/highlights.scm"),
             file_module(b, tree_sitter_dep, "tree-sitter-zig/queries/highlights.scm"),
+            file_module(b, tree_sitter_dep, "tree-sitter-ziggy/tree-sitter-ziggy/queries/highlights.scm"),
 
             file_module(b, tree_sitter_dep, "tree-sitter-cpp/queries/injections.scm"),
             file_module(b, tree_sitter_dep, "tree-sitter-gitcommit/queries/injections.scm"),
