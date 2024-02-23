@@ -211,12 +211,13 @@ pub const php = .{
     .injections = @embedFile("tree-sitter-php/queries/injections.scm"),
 };
 
-// conflicts with haskell
-// pub const purescript = .{
-//     .extensions = &[_][]const u8{"purs"},
-//     .comment = "--",
-//     .injections = @embedFile("tree-sitter-purescript/queries/injections.scm"),
-// };
+pub const purescript = .{
+    .color = 0x14161a,
+    .icon = "",
+    .extensions = &[_][]const u8{"purs"},
+    .comment = "--",
+    .injections = @embedFile("tree-sitter-purescript/queries/injections.scm"),
+};
 
 pub const python = .{
     .color = 0xffd845,
