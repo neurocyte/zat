@@ -3,6 +3,11 @@ set -e
 
 ARCH=$(uname -m)
 
+# fix M1 Mac architecture name
+if [ "$ARCH" == "arm64" ]; then
+    ARCH=aarch64
+fi
+
 BASEDIR="$(cd "$(dirname "$0")" && pwd)"
 ZIGDIR=$BASEDIR/.cache/zig
 VERSION=$(< build.zig.version)
