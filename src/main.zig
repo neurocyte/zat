@@ -109,7 +109,7 @@ fn render_file(a: std.mem.Allocator, writer: anytype, content: []const u8, file_
         content: []const u8,
         theme: *const Theme,
         last_pos: usize = 0,
-        fn cb(ctx: *@This(), range: syntax.Range, scope: []const u8, id: u32, idx: usize) error{Stop}!void {
+        fn cb(ctx: *@This(), range: syntax.Range, scope: []const u8, id: u32, idx: usize, _: *const syntax.Node) error{Stop}!void {
             if (idx > 0) return;
 
             if (ctx.last_pos < range.start_byte) {
