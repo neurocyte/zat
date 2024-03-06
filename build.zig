@@ -7,6 +7,7 @@ pub fn build(b: *std.Build) void {
     const clap_dep = b.dependency("clap", .{ .target = target, .optimize = optimize });
     const themes_dep = b.dependency("themes", .{});
     const syntax_dep = b.dependency("syntax", .{ .target = target, .optimize = optimize });
+    const thespian_dep = b.dependency("thespian", .{});
 
     const exe = b.addExecutable(.{
         .name = "zat",
@@ -18,6 +19,7 @@ pub fn build(b: *std.Build) void {
     exe.root_module.addImport("theme", themes_dep.module("theme"));
     exe.root_module.addImport("themes", themes_dep.module("themes"));
     exe.root_module.addImport("clap", clap_dep.module("clap"));
+    exe.root_module.addImport("cbor", b.createModule(.{ .root_source_file = thespian_dep.path("src/cbor.zig") }));
     b.installArtifact(exe);
 
     const run_cmd = b.addRunArtifact(exe);

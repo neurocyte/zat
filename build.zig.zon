@@ -14,6 +14,10 @@
             .url = "https://github.com/neurocyte/flow-syntax/archive/e58df221cc9ea8086fdb26df348f04429361d1f0.tar.gz",
             .hash = "1220f1772359f6c1fc04df79b3f9aa5899efc87b3b8d0e65f44b40df66260cf79183",
         },
+        .thespian = .{
+            .url = "https://github.com/neurocyte/thespian/archive/a740c03c11ab22b93c050bfc27cb936be86f9b39.tar.gz",
+            .hash = "1220ecd65090063ac90cd462b09ba603736cb03f4863d831c4f6c46189d2b1a1267a",
+        },
     },
     .paths = .{
         "build.zig",

@@ -1,4 +1,5 @@
 const std = @import("std");
+const cbor = @import("cbor");
 
 const application_name = "flow";
 
@@ -12,7 +13,6 @@ pub fn read_config(a: std.mem.Allocator, buf: *?[]const u8) config {
 }
 
 fn read_json_config_file(a: std.mem.Allocator, file_name: []const u8, buf: *?[]const u8) !config {
-    const cbor = @import("cbor.zig");
     var file = std.fs.openFileAbsolute(file_name, .{ .mode = .read_only }) catch |e| switch (e) {
         error.FileNotFound => return .{},
         else => return e,
