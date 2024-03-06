@@ -45,6 +45,7 @@ pub fn main() !void {
     const stdout_file = std.io.getStdOut().writer();
     var bw = std.io.bufferedWriter(stdout_file);
     const writer = bw.writer();
+    defer bw.flush() catch {};
 
     if (res.args.help != 0)
         return clap.help(std.io.getStdErr().writer(), clap.Help, &params, .{});
@@ -96,8 +97,6 @@ pub fn main() !void {
 
     if (res.args.html != 0)
         try write_html_postamble(writer);
-
-    try bw.flush();
 }
 
 fn get_parser(a: std.mem.Allocator, content: []const u8, file_path: []const u8) *syntax {
