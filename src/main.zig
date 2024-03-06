@@ -6,6 +6,7 @@ const themes = @import("themes");
 const term = @import("ansi-term.zig");
 const config_loader = @import("config_loader.zig");
 
+const Writer = std.io.BufferedWriter(4096, std.fs.File.Writer).Writer;
 const StyleCache = std.AutoHashMap(u32, ?Theme.Token);
 var style_cache: StyleCache = undefined;
 var lang_override: ?[]const u8 = null;
@@ -18,6 +19,7 @@ pub fn main() !void {
         \\-t, --theme <str>        Select theme to use.
         \\-d, --default <str>      Set the language to use if guessing failed (default: conf).
         \\-s, --show-language      Show detected language in output.
+        \\--html                   Output HTML instead of ansi escape codes.
         \\--list-themes            Show available themes.
         \\--list-languages         Show available language parsers.
         \\<str>...                 File to open.
@@ -40,14 +42,18 @@ pub fn main() !void {
     };
     defer res.deinit();
 
+    const stdout_file = std.io.getStdOut().writer();
+    var bw = std.io.bufferedWriter(stdout_file);
+    const writer = bw.writer();
+
     if (res.args.help != 0)
         return clap.help(std.io.getStdErr().writer(), clap.Help, &params, .{});
 
     if (res.args.@"list-themes" != 0)
-        return list_themes(std.io.getStdOut().writer());
+        return list_themes(writer);
 
     if (res.args.@"list-languages" != 0)
-        return list_langs(std.io.getStdOut().writer());
+        return list_langs(writer);
 
     var conf_buf: ?[]const u8 = null;
     const conf = config_loader.read_config(a, &conf_buf);
@@ -58,12 +64,14 @@ pub fn main() !void {
         std.os.exit(1);
     };
 
+    const set_style: StyleFn = if (res.args.html != 0) set_html_style else set_ansi_style;
+    const unset_style: StyleFn = if (res.args.html != 0) unset_html_style else unset_ansi_style;
+
     lang_override = res.args.language;
     if (res.args.default) |default| lang_default = default;
 
-    const stdout_file = std.io.getStdOut().writer();
-    var bw = std.io.bufferedWriter(stdout_file);
-    const writer = bw.writer();
+    if (res.args.html != 0)
+        try write_html_preamble(writer, theme.editor);
 
     if (res.positionals.len > 0) {
         for (res.positionals) |arg| {
@@ -71,7 +79,7 @@ pub fn main() !void {
             defer file.close();
             const content = try file.readToEndAlloc(a, std.math.maxInt(u32));
             defer a.free(content);
-            render_file(a, writer, content, arg, &theme, res.args.@"show-language" != 0) catch |e| switch (e) {
+            render_file(a, writer, content, arg, &theme, res.args.@"show-language" != 0, set_style, unset_style) catch |e| switch (e) {
                 error.Stop => return,
                 else => return e,
             };
@@ -80,11 +88,15 @@ pub fn main() !void {
     } else {
         const content = try std.io.getStdIn().readToEndAlloc(a, std.math.maxInt(u32));
         defer a.free(content);
-        render_file(a, writer, content, "-", &theme, res.args.@"show-language" != 0) catch |e| switch (e) {
+        render_file(a, writer, content, "-", &theme, res.args.@"show-language" != 0, set_style, unset_style) catch |e| switch (e) {
             error.Stop => return,
             else => return e,
         };
     }
+
+    if (res.args.html != 0)
+        try write_html_postamble(writer);
+
     try bw.flush();
 }
 
@@ -100,7 +112,9 @@ fn unknown_file_type(name: []const u8) noreturn {
     std.os.exit(1);
 }
 
-fn render_file(a: std.mem.Allocator, writer: anytype, content: []const u8, file_path: []const u8, theme: *const Theme, show: bool) !void {
+const StyleFn = *const fn (writer: Writer, style: Theme.Style, fallback: Theme.Style) Writer.Error!void;
+
+fn render_file(a: std.mem.Allocator, writer: Writer, content: []const u8, file_path: []const u8, theme: *const Theme, show: bool, set_style: StyleFn, unset_style: StyleFn) !void {
     const parser = get_parser(a, content, file_path);
     if (show) try render_file_type(writer, parser.file_type, theme);
 
@@ -109,6 +123,8 @@ fn render_file(a: std.mem.Allocator, writer: anytype, content: []const u8, file_
         content: []const u8,
         theme: *const Theme,
         last_pos: usize = 0,
+        set_style: StyleFn,
+        unset_style: StyleFn,
         fn cb(ctx: *@This(), range: syntax.Range, scope: []const u8, id: u32, idx: usize, _: *const syntax.Node) error{Stop}!void {
             if (idx > 0) return;
 
@@ -120,16 +136,16 @@ fn render_file(a: std.mem.Allocator, writer: anytype, content: []const u8, file_
 
             const plain: Theme.Style = Theme.Style{ .fg = ctx.theme.editor.fg };
             if (style_cache_lookup(ctx.theme, scope, id)) |token| {
-                set_ansi_style(ctx.writer, token.style, plain) catch return error.Stop;
+                ctx.set_style(ctx.writer, token.style, plain) catch return error.Stop;
                 ctx.writer.writeAll(ctx.content[range.start_byte..range.end_byte]) catch return error.Stop;
-                set_ansi_style(ctx.writer, plain, plain) catch return error.Stop;
+                ctx.unset_style(ctx.writer, plain, plain) catch return error.Stop;
             } else {
                 ctx.writer.writeAll(ctx.content[range.start_byte..range.end_byte]) catch return error.Stop;
             }
             ctx.last_pos = range.end_byte;
         }
     };
-    var ctx: Ctx = .{ .writer = writer, .content = content, .theme = theme };
+    var ctx: Ctx = .{ .writer = writer, .content = content, .theme = theme, .set_style = set_style, .unset_style = unset_style };
     try parser.render(&ctx, Ctx.cb, null);
     try ctx.writer.writeAll(content[ctx.last_pos..]);
 }
@@ -221,7 +237,7 @@ fn get_theme_by_name(name: []const u8) ?Theme {
     return null;
 }
 
-fn list_themes(writer: anytype) !void {
+fn list_themes(writer: Writer) !void {
     var max_name_len: usize = 0;
     for (themes.themes) |theme|
         max_name_len = @max(max_name_len, theme.name.len);
@@ -234,7 +250,7 @@ fn list_themes(writer: anytype) !void {
     }
 }
 
-fn set_ansi_style(writer: anytype, style: Theme.Style, fallback: Theme.Style) !void {
+fn set_ansi_style(writer: Writer, style: Theme.Style, fallback: Theme.Style) Writer.Error!void {
     const ansi_style = .{
         .foreground = if (style.fg) |color| to_rgb_color(color) else if (fallback.fg) |color| to_rgb_color(color) else .Default,
         .background = if (style.bg) |color| to_rgb_color(color) else if (fallback.bg) |color| to_rgb_color(color) else .Default,
@@ -249,6 +265,40 @@ fn set_ansi_style(writer: anytype, style: Theme.Style, fallback: Theme.Style) !v
     try term.format.updateStyle(writer, ansi_style, null);
 }
 
+const unset_ansi_style = set_ansi_style;
+
+fn write_html_preamble(writer: Writer, style: Theme.Style) !void {
+    const color = if (style.fg) |color| color else 0;
+    const background = if (style.bg) |background| background else 0xFFFFFF;
+    try writer.writeAll("<div style=\"color:");
+    try write_hex_color(writer, color);
+    try writer.writeAll(";background-color:");
+    try write_hex_color(writer, background);
+    try writer.writeAll(";\"><pre>");
+}
+
+fn write_html_postamble(writer: Writer) !void {
+    try writer.writeAll("</pre></div>");
+}
+
+fn set_html_style(writer: Writer, style: Theme.Style, fallback: Theme.Style) !void {
+    const color = if (style.fg) |color| color else if (fallback.fg) |color| color else 0;
+    try writer.writeAll("<span style=\"color:");
+    try write_hex_color(writer, color);
+    switch (style.fs orelse .normal) {
+        .normal => {},
+        .bold => try writer.writeAll(";font-weight: bold"),
+        .italic => try writer.writeAll(";font-style: italic"),
+        .underline => try writer.writeAll(";text-decoration: underline"),
+        .strikethrough => try writer.writeAll(";text-decoration: line-through"),
+    }
+    try writer.writeAll(";\">");
+}
+
+fn unset_html_style(writer: Writer, _: Theme.Style, _: Theme.Style) !void {
+    try writer.writeAll("</span>");
+}
+
 fn to_rgb_color(color: u24) term.style.Color {
     const r = @as(u8, @intCast(color >> 16 & 0xFF));
     const g = @as(u8, @intCast(color >> 8 & 0xFF));
@@ -256,14 +306,18 @@ fn to_rgb_color(color: u24) term.style.Color {
     return .{ .RGB = .{ .r = r, .g = g, .b = b } };
 }
 
-fn list_langs(writer: anytype) !void {
+fn write_hex_color(writer: Writer, color: u24) !void {
+    try writer.print("#{x:0>6}", .{color});
+}
+
+fn list_langs(writer: Writer) !void {
     for (syntax.FileType.file_types) |file_type| {
         try writer.writeAll(file_type.name);
         try writer.writeAll("\n");
     }
 }
 
-fn render_file_type(writer: anytype, file_type: *const syntax.FileType, theme: *const Theme) !void {
+fn render_file_type(writer: Writer, file_type: *const syntax.FileType, theme: *const Theme) !void {
     const style = theme.editor_selection;
     const reversed = Theme.Style{ .fg = theme.editor_selection.bg };
     const plain: Theme.Style = Theme.Style{ .fg = theme.editor.fg };
