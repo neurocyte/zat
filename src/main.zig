@@ -15,14 +15,16 @@ var lang_default: []const u8 = "conf";
 pub fn main() !void {
     const params = comptime clap.parseParamsComptime(
         \\-h, --help               Display this help and exit.
-        \\-l, --language <str>     Override the language.
-        \\-t, --theme <str>        Select theme to use.
-        \\-d, --default <str>      Set the language to use if guessing failed (default: conf).
+        \\-l, --language <name>    Override the language.
+        \\-t, --theme <name>       Select theme to use.
+        \\-d, --default <name>     Set the language to use if guessing failed (default: conf).
         \\-s, --show-language      Show detected language in output.
         \\--html                   Output HTML instead of ansi escape codes.
         \\--list-themes            Show available themes.
         \\--list-languages         Show available language parsers.
-        \\<str>...                 File to open.
+        \\-H, --highlight <line>   Highlight a line.
+        \\-L, --limit <lines>      Limit output to <lines> around <line> or from the beginning.
+        \\<file>...                File to open.
         \\
     );
 
@@ -30,8 +32,14 @@ pub fn main() !void {
     const a = gpa.allocator();
     style_cache = StyleCache.init(a);
 
+    const parsers = comptime .{
+        .name = clap.parsers.string,
+        .file = clap.parsers.string,
+        .line = clap.parsers.int(usize, 10),
+        .lines = clap.parsers.int(usize, 10),
+    };
     var diag = clap.Diagnostic{};
-    var res = clap.parse(clap.Help, &params, clap.parsers.default, .{
+    var res = clap.parse(clap.Help, &params, parsers, .{
         .diagnostic = &diag,
         .allocator = a,
     }) catch |err| {
@@ -59,6 +67,8 @@ pub fn main() !void {
     var conf_buf: ?[]const u8 = null;
     const conf = config_loader.read_config(a, &conf_buf);
     const theme_name = if (res.args.theme) |theme| theme else conf.theme;
+    const highlight_line = res.args.highlight;
+    const limit_lines = res.args.limit;
 
     const theme = get_theme_by_name(theme_name) orelse {
         try std.io.getStdErr().writer().print("theme \"{s}\" not found\n", .{theme_name});
@@ -80,7 +90,7 @@ pub fn main() !void {
             defer file.close();
             const content = try file.readToEndAlloc(a, std.math.maxInt(u32));
             defer a.free(content);
-            render_file(a, writer, content, arg, &theme, res.args.@"show-language" != 0, set_style, unset_style) catch |e| switch (e) {
+            render_file(a, writer, content, arg, &theme, res.args.@"show-language" != 0, set_style, unset_style, highlight_line, limit_lines) catch |e| switch (e) {
                 error.Stop => return,
                 else => return e,
             };
@@ -89,7 +99,7 @@ pub fn main() !void {
     } else {
         const content = try std.io.getStdIn().readToEndAlloc(a, std.math.maxInt(u32));
         defer a.free(content);
-        render_file(a, writer, content, "-", &theme, res.args.@"show-language" != 0, set_style, unset_style) catch |e| switch (e) {
+        render_file(a, writer, content, "-", &theme, res.args.@"show-language" != 0, set_style, unset_style, highlight_line, limit_lines) catch |e| switch (e) {
             error.Stop => return,
             else => return e,
         };
@@ -111,11 +121,36 @@ fn unknown_file_type(name: []const u8) noreturn {
     std.os.exit(1);
 }
 
-const StyleFn = *const fn (writer: Writer, style: Theme.Style, fallback: Theme.Style) Writer.Error!void;
+const StyleFn = *const fn (writer: Writer, style: Theme.Style) Writer.Error!void;
 
-fn render_file(a: std.mem.Allocator, writer: Writer, content: []const u8, file_path: []const u8, theme: *const Theme, show: bool, set_style: StyleFn, unset_style: StyleFn) !void {
+fn render_file(
+    a: std.mem.Allocator,
+    writer: Writer,
+    content: []const u8,
+    file_path: []const u8,
+    theme: *const Theme,
+    show: bool,
+    set_style: StyleFn,
+    unset_style: StyleFn,
+    highlight_line: ?usize,
+    limit_lines: ?usize,
+) !void {
+    var start_line: usize = 1;
+    var end_line: usize = std.math.maxInt(usize);
+
+    if (limit_lines) |lines| {
+        const center = (lines - 1) / 2;
+        if (highlight_line) |hl| if (hl > center) {
+            start_line = hl - center;
+        };
+        end_line = start_line + lines;
+    }
+
     const parser = get_parser(a, content, file_path);
-    if (show) try render_file_type(writer, parser.file_type, theme);
+    if (show) {
+        try render_file_type(writer, parser.file_type, theme);
+        end_line -= 1;
+    }
 
     const Ctx = struct {
         writer: @TypeOf(writer),
@@ -124,29 +159,86 @@ fn render_file(a: std.mem.Allocator, writer: Writer, content: []const u8, file_p
         last_pos: usize = 0,
         set_style: StyleFn,
         unset_style: StyleFn,
+        start_line: usize,
+        end_line: usize,
+        highlight_line: usize,
+        current_line: usize = 1,
+
+        fn write_styled(ctx: *@This(), text: []const u8, style: Theme.Style) !void {
+            if (!(ctx.start_line <= ctx.current_line and ctx.current_line <= ctx.end_line)) return;
+            if (ctx.current_line == ctx.highlight_line) {
+                try ctx.set_style(ctx.writer, .{ .fg = style.fg, .bg = ctx.theme.editor_line_highlight.bg });
+                try ctx.writer.writeAll(text);
+                try ctx.unset_style(ctx.writer, .{ .fg = ctx.theme.editor.fg });
+            } else {
+                try ctx.set_style(ctx.writer, .{ .fg = style.fg });
+                try ctx.writer.writeAll(text);
+                try ctx.unset_style(ctx.writer, .{ .fg = ctx.theme.editor.fg });
+            }
+        }
+
+        fn write_lines_styled(ctx: *@This(), text_: []const u8, style: Theme.Style) !void {
+            var text = text_;
+            while (std.mem.indexOf(u8, text, "\n")) |pos| {
+                try ctx.write_styled(text[0 .. pos + 1], style);
+                ctx.current_line += 1;
+                text = text[pos + 1 ..];
+            }
+            try ctx.write_styled(text, style);
+        }
+
         fn cb(ctx: *@This(), range: syntax.Range, scope: []const u8, id: u32, idx: usize, _: *const syntax.Node) error{Stop}!void {
             if (idx > 0) return;
 
             if (ctx.last_pos < range.start_byte) {
-                ctx.writer.writeAll(ctx.content[ctx.last_pos..range.start_byte]) catch return error.Stop;
+                const before_segment = ctx.content[ctx.last_pos..range.start_byte];
+                ctx.write_lines_styled(before_segment, ctx.theme.editor) catch return error.Stop;
                 ctx.last_pos = range.start_byte;
             }
+
             if (range.start_byte < ctx.last_pos) return;
 
-            const plain: Theme.Style = Theme.Style{ .fg = ctx.theme.editor.fg };
+            const scope_segment = ctx.content[range.start_byte..range.end_byte];
             if (style_cache_lookup(ctx.theme, scope, id)) |token| {
-                ctx.set_style(ctx.writer, token.style, plain) catch return error.Stop;
-                ctx.writer.writeAll(ctx.content[range.start_byte..range.end_byte]) catch return error.Stop;
-                ctx.unset_style(ctx.writer, plain, plain) catch return error.Stop;
+                ctx.write_lines_styled(scope_segment, token.style) catch return error.Stop;
             } else {
-                ctx.writer.writeAll(ctx.content[range.start_byte..range.end_byte]) catch return error.Stop;
+                ctx.write_lines_styled(scope_segment, ctx.theme.editor) catch return error.Stop;
             }
             ctx.last_pos = range.end_byte;
+            if (ctx.current_line >= ctx.end_line)
+                return error.Stop;
         }
     };
-    var ctx: Ctx = .{ .writer = writer, .content = content, .theme = theme, .set_style = set_style, .unset_style = unset_style };
-    try parser.render(&ctx, Ctx.cb, null);
-    try ctx.writer.writeAll(content[ctx.last_pos..]);
+    var ctx: Ctx = .{
+        .writer = writer,
+        .content = content,
+        .theme = theme,
+        .set_style = set_style,
+        .unset_style = unset_style,
+        .start_line = start_line,
+        .end_line = end_line,
+        .highlight_line = highlight_line orelse std.math.maxInt(usize),
+    };
+    const range: ?syntax.Range = ret: {
+        if (limit_lines) |_| break :ret .{
+            .start_point = .{ .row = @intCast(start_line - 1), .column = 0 },
+            .end_point = .{ .row = @intCast(end_line - 1), .column = 0 },
+            .start_byte = 0,
+            .end_byte = 0,
+        };
+        break :ret null;
+    };
+    try parser.render(&ctx, Ctx.cb, range);
+    while (ctx.current_line < end_line) {
+        if (std.mem.indexOfPos(u8, content, ctx.last_pos, "\n")) |pos| {
+            try ctx.writer.writeAll(content[ctx.last_pos .. pos + 1]);
+            ctx.current_line += 1;
+            ctx.last_pos = pos + 1;
+        } else {
+            try ctx.writer.writeAll(content[ctx.last_pos..]);
+            break;
+        }
+    }
 }
 
 fn style_cache_lookup(theme: *const Theme, scope: []const u8, id: u32) ?Theme.Token {
@@ -249,10 +341,10 @@ fn list_themes(writer: Writer) !void {
     }
 }
 
-fn set_ansi_style(writer: Writer, style: Theme.Style, fallback: Theme.Style) Writer.Error!void {
+fn set_ansi_style(writer: Writer, style: Theme.Style) Writer.Error!void {
     const ansi_style = .{
-        .foreground = if (style.fg) |color| to_rgb_color(color) else if (fallback.fg) |color| to_rgb_color(color) else .Default,
-        .background = if (style.bg) |color| to_rgb_color(color) else if (fallback.bg) |color| to_rgb_color(color) else .Default,
+        .foreground = if (style.fg) |color| to_rgb_color(color) else .Default,
+        .background = if (style.bg) |color| to_rgb_color(color) else .Default,
         .font_style = switch (style.fs orelse .normal) {
             .normal => term.style.FontStyle{},
             .bold => term.style.FontStyle.bold,
@@ -280,8 +372,8 @@ fn write_html_postamble(writer: Writer) !void {
     try writer.writeAll("</pre></div>");
 }
 
-fn set_html_style(writer: Writer, style: Theme.Style, fallback: Theme.Style) !void {
-    const color = if (style.fg) |color| color else if (fallback.fg) |color| color else 0;
+fn set_html_style(writer: Writer, style: Theme.Style) !void {
+    const color = if (style.fg) |color| color else 0;
     try writer.writeAll("<span style=\"color:");
     try write_hex_color(writer, color);
     switch (style.fs orelse .normal) {
@@ -294,7 +386,7 @@ fn set_html_style(writer: Writer, style: Theme.Style, fallback: Theme.Style) !vo
     try writer.writeAll(";\">");
 }
 
-fn unset_html_style(writer: Writer, _: Theme.Style, _: Theme.Style) !void {
+fn unset_html_style(writer: Writer, _: Theme.Style) !void {
     try writer.writeAll("</span>");
 }
 
@@ -320,18 +412,18 @@ fn render_file_type(writer: Writer, file_type: *const syntax.FileType, theme: *c
     const style = theme.editor_selection;
     const reversed = Theme.Style{ .fg = theme.editor_selection.bg };
     const plain: Theme.Style = Theme.Style{ .fg = theme.editor.fg };
-    try set_ansi_style(writer, reversed, plain);
+    try set_ansi_style(writer, reversed);
     try writer.writeAll("");
     try set_ansi_style(writer, .{
         .fg = if (file_type.color == 0xFFFFFF or file_type.color == 0x000000) style.fg else file_type.color,
         .bg = style.bg,
-    }, plain);
+    });
     try writer.writeAll(file_type.icon);
     try writer.writeAll(" ");
-    try set_ansi_style(writer, style, plain);
+    try set_ansi_style(writer, style);
     try writer.writeAll(file_type.name);
-    try set_ansi_style(writer, reversed, plain);
+    try set_ansi_style(writer, reversed);
     try writer.writeAll("");
-    try set_ansi_style(writer, plain, plain);
+    try set_ansi_style(writer, plain);
     try writer.writeAll("\n");
 }

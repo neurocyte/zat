@@ -24,4 +24,6 @@ like with cat. If no files are on the command line zat will read from stdin.
 Override the language with --language and select a different theme with --theme.
 The default theme will be read from ~/.config/flow/config.json if found.
 
+See `scripts/fzf-grep` for an example of using zat to highlight fzf previews.
+
 See --help for full command line.

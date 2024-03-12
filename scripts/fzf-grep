@@ -1,0 +1,18 @@
+#!/usr/bin/env bash
+
+set -eEuCo pipefail
+
+rg \
+    --no-heading \
+    --color always \
+    -n \
+    "$@" \
+| fzf \
+        --marker=\* \
+        --delimiter=: \
+        --border \
+        --cycle \
+        --layout=reverse \
+        --ansi \
+        --tiebreak=index \
+        --preview 'zat --highlight {2} --limit $FZF_PREVIEW_LINES {1}'
