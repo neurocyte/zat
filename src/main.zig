@@ -11,6 +11,7 @@ const StyleCache = std.AutoHashMap(u32, ?Theme.Token);
 var style_cache: StyleCache = undefined;
 var lang_override: ?[]const u8 = null;
 var lang_default: []const u8 = "conf";
+const no_highlight = std.math.maxInt(usize);
 
 pub fn main() !void {
     const params = comptime clap.parseParamsComptime(
@@ -22,8 +23,10 @@ pub fn main() !void {
         \\--html                   Output HTML instead of ansi escape codes.
         \\--list-themes            Show available themes.
         \\--list-languages         Show available language parsers.
-        \\-H, --highlight <line>   Highlight a line.
-        \\-L, --limit <lines>      Limit output to <lines> around <line> or from the beginning.
+        \\-H, --highlight <range>  Highlight a line or a line range:
+        \\                         * LINE highlight just a single whole line
+        \\                         * LINE,LINE highlight a line range
+        \\-L, --limit <lines>      Limit output to <lines> around <range> or from the beginning.
         \\<file>...                File to open.
         \\
     );
@@ -35,7 +38,7 @@ pub fn main() !void {
     const parsers = comptime .{
         .name = clap.parsers.string,
         .file = clap.parsers.string,
-        .line = clap.parsers.int(usize, 10),
+        .range = clap.parsers.string,
         .lines = clap.parsers.int(usize, 10),
     };
     var diag = clap.Diagnostic{};
@@ -67,12 +70,26 @@ pub fn main() !void {
     var conf_buf: ?[]const u8 = null;
     const conf = config_loader.read_config(a, &conf_buf);
     const theme_name = if (res.args.theme) |theme| theme else conf.theme;
-    const highlight_line = res.args.highlight;
     const limit_lines = res.args.limit;
+
+    var highlight_line_start: usize = no_highlight;
+    var highlight_line_end: usize = no_highlight;
+    if (res.args.highlight) |parm| {
+        var it = std.mem.splitScalar(u8, parm, ',');
+        highlight_line_start = std.fmt.parseInt(usize, it.first(), 10) catch no_highlight;
+        highlight_line_end = highlight_line_start;
+        if (it.next()) |end|
+            highlight_line_end = std.fmt.parseInt(usize, end, 10) catch highlight_line_start;
+    }
+
+    if (highlight_line_end < highlight_line_start) {
+        try std.io.getStdErr().writer().print("invalid range\n", .{});
+        std.process.exit(1);
+    }
 
     const theme = get_theme_by_name(theme_name) orelse {
         try std.io.getStdErr().writer().print("theme \"{s}\" not found\n", .{theme_name});
-        std.os.exit(1);
+        std.process.exit(1);
     };
 
     const set_style: StyleFn = if (res.args.html != 0) set_html_style else set_ansi_style;
@@ -90,7 +107,19 @@ pub fn main() !void {
             defer file.close();
             const content = try file.readToEndAlloc(a, std.math.maxInt(u32));
             defer a.free(content);
-            render_file(a, writer, content, arg, &theme, res.args.@"show-language" != 0, set_style, unset_style, highlight_line, limit_lines) catch |e| switch (e) {
+            render_file(
+                a,
+                writer,
+                content,
+                arg,
+                &theme,
+                res.args.@"show-language" != 0,
+                set_style,
+                unset_style,
+                highlight_line_start,
+                highlight_line_end,
+                limit_lines,
+            ) catch |e| switch (e) {
                 error.Stop => return,
                 else => return e,
             };
@@ -99,7 +128,19 @@ pub fn main() !void {
     } else {
         const content = try std.io.getStdIn().readToEndAlloc(a, std.math.maxInt(u32));
         defer a.free(content);
-        render_file(a, writer, content, "-", &theme, res.args.@"show-language" != 0, set_style, unset_style, highlight_line, limit_lines) catch |e| switch (e) {
+        render_file(
+            a,
+            writer,
+            content,
+            "-",
+            &theme,
+            res.args.@"show-language" != 0,
+            set_style,
+            unset_style,
+            highlight_line_start,
+            highlight_line_end,
+            limit_lines,
+        ) catch |e| switch (e) {
             error.Stop => return,
             else => return e,
         };
@@ -132,7 +173,8 @@ fn render_file(
     show: bool,
     set_style: StyleFn,
     unset_style: StyleFn,
-    highlight_line: ?usize,
+    highlight_line_start: usize,
+    highlight_line_end: usize,
     limit_lines: ?usize,
 ) !void {
     var start_line: usize = 1;
@@ -140,9 +182,13 @@ fn render_file(
 
     if (limit_lines) |lines| {
         const center = (lines - 1) / 2;
-        if (highlight_line) |hl| if (hl > center) {
-            start_line = hl - center;
-        };
+        if (highlight_line_start != no_highlight) {
+            const range_size = highlight_line_end - highlight_line_start;
+            const top = center - @min(center, range_size / 2);
+            if (highlight_line_start > top) {
+                start_line = highlight_line_start - top;
+            }
+        }
         end_line = start_line + lines;
     }
 
@@ -161,20 +207,21 @@ fn render_file(
         unset_style: StyleFn,
         start_line: usize,
         end_line: usize,
-        highlight_line: usize,
+        highlight_line_start: usize,
+        highlight_line_end: usize,
         current_line: usize = 1,
 
         fn write_styled(ctx: *@This(), text: []const u8, style: Theme.Style) !void {
             if (!(ctx.start_line <= ctx.current_line and ctx.current_line <= ctx.end_line)) return;
-            if (ctx.current_line == ctx.highlight_line) {
-                try ctx.set_style(ctx.writer, .{ .fg = style.fg, .bg = ctx.theme.editor_line_highlight.bg });
-                try ctx.writer.writeAll(text);
-                try ctx.unset_style(ctx.writer, .{ .fg = ctx.theme.editor.fg });
-            } else {
-                try ctx.set_style(ctx.writer, .{ .fg = style.fg });
-                try ctx.writer.writeAll(text);
-                try ctx.unset_style(ctx.writer, .{ .fg = ctx.theme.editor.fg });
-            }
+
+            const style_: Theme.Style = if (ctx.highlight_line_start <= ctx.current_line and ctx.current_line <= ctx.highlight_line_end)
+                .{ .fg = style.fg, .bg = ctx.theme.editor_line_highlight.bg }
+            else
+                .{ .fg = style.fg };
+
+            try ctx.set_style(ctx.writer, style_);
+            try ctx.writer.writeAll(text);
+            try ctx.unset_style(ctx.writer, .{ .fg = ctx.theme.editor.fg });
         }
 
         fn write_lines_styled(ctx: *@This(), text_: []const u8, style: Theme.Style) !void {
@@ -217,7 +264,8 @@ fn render_file(
         .unset_style = unset_style,
         .start_line = start_line,
         .end_line = end_line,
-        .highlight_line = highlight_line orelse std.math.maxInt(usize),
+        .highlight_line_start = highlight_line_start,
+        .highlight_line_end = highlight_line_end,
     };
     const range: ?syntax.Range = ret: {
         if (limit_lines) |_| break :ret .{
