@@ -49,14 +49,14 @@ pub fn get_config_dir() ![]const u8 {
 
 fn get_app_config_dir(appname: []const u8) ![]const u8 {
     const local = struct {
-        var config_dir_buffer: [std.os.PATH_MAX]u8 = undefined;
+        var config_dir_buffer: [std.posix.PATH_MAX]u8 = undefined;
         var config_dir: ?[]const u8 = null;
     };
     const config_dir = if (local.config_dir) |dir|
         dir
-    else if (std.os.getenv("XDG_CONFIG_HOME")) |xdg|
+    else if (std.posix.getenv("XDG_CONFIG_HOME")) |xdg|
         try std.fmt.bufPrint(&local.config_dir_buffer, "{s}/{s}", .{ xdg, appname })
-    else if (std.os.getenv("HOME")) |home|
+    else if (std.posix.getenv("HOME")) |home|
         try std.fmt.bufPrint(&local.config_dir_buffer, "{s}/.config/{s}", .{ home, appname })
     else
         return error.AppConfigDirUnavailable;
@@ -70,7 +70,7 @@ fn get_app_config_dir(appname: []const u8) ![]const u8 {
 
 fn get_app_config_file_name(appname: []const u8) ![]const u8 {
     const local = struct {
-        var config_file_buffer: [std.os.PATH_MAX]u8 = undefined;
+        var config_file_buffer: [std.posix.PATH_MAX]u8 = undefined;
         var config_file: ?[]const u8 = null;
     };
     const config_file_name = "config.json";

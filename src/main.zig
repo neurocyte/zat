@@ -45,7 +45,7 @@ pub fn main() !void {
     }) catch |err| {
         diag.report(std.io.getStdErr().writer(), err) catch {};
         clap.help(std.io.getStdErr().writer(), clap.Help, &params, .{}) catch {};
-        std.os.exit(1);
+        std.process.exit(1);
         return err;
     };
     defer res.deinit();
@@ -118,7 +118,7 @@ fn get_parser(a: std.mem.Allocator, content: []const u8, file_path: []const u8) 
 
 fn unknown_file_type(name: []const u8) noreturn {
     std.io.getStdErr().writer().print("unknown file type \'{s}\'\n", .{name}) catch {};
-    std.os.exit(1);
+    std.process.exit(1);
 }
 
 const StyleFn = *const fn (writer: Writer, style: Theme.Style) Writer.Error!void;
