@@ -215,7 +215,7 @@ fn render_file(
             if (!(ctx.start_line <= ctx.current_line and ctx.current_line <= ctx.end_line)) return;
 
             const style_: Theme.Style = if (ctx.highlight_line_start <= ctx.current_line and ctx.current_line <= ctx.highlight_line_end)
-                .{ .fg = style.fg, .bg = ctx.theme.editor_line_highlight.bg }
+                .{ .fg = style.fg, .bg = ctx.theme.editor_selection.bg }
             else
                 .{ .fg = style.fg };
 
