@@ -3,7 +3,7 @@ const clap = @import("clap");
 const syntax = @import("syntax");
 const Theme = @import("theme");
 const themes = @import("themes");
-const term = @import("ansi-term.zig");
+const term = @import("ansi-term");
 const config_loader = @import("config_loader.zig");
 
 const Writer = std.io.BufferedWriter(4096, std.fs.File.Writer).Writer;

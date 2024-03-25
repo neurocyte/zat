@@ -18,6 +18,10 @@
             .url = "https://github.com/neurocyte/thespian/archive/d20e071a4d50b92bce196040b151988f96985c87.tar.gz",
             .hash = "12209e9d22ddb9ef7ff18e8781234fbb149c297cf23dda366269b0bbee437a2b8f32",
         },
+        .@"ansi-term" = .{
+            .url = "https://github.com/ziglibs/ansi-term/archive/ed0f6c223539c187ba1b54c5cf0cc3b11104188f.tar.gz",
+            .hash = "12200297afdfc2babebdba3b4950ef8a478fd4cf7aea3354644d348739270580afe9",
+        },
     },
     .paths = .{
         "build.zig",
