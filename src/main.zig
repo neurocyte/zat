@@ -398,6 +398,7 @@ fn set_ansi_style(writer: Writer, style: Theme.Style) Writer.Error!void {
             .bold => term.style.FontStyle.bold,
             .italic => term.style.FontStyle.italic,
             .underline => term.style.FontStyle.underline,
+            .undercurl => term.style.FontStyle.underline,
             .strikethrough => term.style.FontStyle.crossedout,
         },
     };
@@ -429,6 +430,7 @@ fn set_html_style(writer: Writer, style: Theme.Style) !void {
         .bold => try writer.writeAll(";font-weight: bold"),
         .italic => try writer.writeAll(";font-style: italic"),
         .underline => try writer.writeAll(";text-decoration: underline"),
+        .undercurl => try writer.writeAll(";text-decoration: underline wavy"),
         .strikethrough => try writer.writeAll(";text-decoration: line-through"),
     }
     try writer.writeAll(";\">");

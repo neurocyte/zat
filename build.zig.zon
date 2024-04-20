@@ -3,20 +3,20 @@
     .version = "0.0.1",
     .dependencies = .{
         .clap = .{
-            .url = "https://github.com/Hejsil/zig-clap/archive/209ba4da76e46412acfe18f711cb0b041ff37f10.tar.gz",
-            .hash = "12200103e7b4a0cb162f2912df4fe97914024a25b5c9fcce6ea4119744f3f2a7f24e",
+            .url = "https://github.com/Hejsil/zig-clap/archive/8c98e6404b22aafc0184e999d8f068b81cc22fa1.tar.gz",
+            .hash = "122014e73fd712190e109950837b97f6143f02d7e2b6986e1db70b6f4aadb5ba6a0d",
         },
         .themes = .{
-            .url = "https://github.com/neurocyte/flow-themes/releases/download/master-e0f55486d2f4f7a2bda2fe543cd3549fef7ce78b/flow-themes.tar.gz",
-            .hash = "122097229e9f3a364a26f08caf6ccc517f17399feefb2990ceef3ce3bd9663dda445",
+            .url = "https://github.com/neurocyte/flow-themes/releases/download/master-63ee1e364ea0a7877e0ece9a309acb75622ff44b/flow-themes.tar.gz",
+            .hash = "1220215680aaaffdbaa570f571d3ade42e241257744571e3d156136be54f58496a54",
         },
         .syntax = .{
-            .url = "https://github.com/neurocyte/flow-syntax/archive/e315c10d635522f0d1f06a70c98f959a0ac4f4ad.tar.gz",
-            .hash = "1220e684d60675371b944f7b733533a6991d233b47043b96cb7f829f18361766ef4c",
+            .url = "https://github.com/neurocyte/flow-syntax/archive/ca031a213e00eeb36b387706d1c07fc400affafc.tar.gz",
+            .hash = "1220512dcd20c4fc31a35ee2cbc5f5a8177effc5a5030c298795ac0c5528408c1083",
         },
         .thespian = .{
-            .url = "https://github.com/neurocyte/thespian/archive/d20e071a4d50b92bce196040b151988f96985c87.tar.gz",
-            .hash = "12209e9d22ddb9ef7ff18e8781234fbb149c297cf23dda366269b0bbee437a2b8f32",
+            .url = "https://github.com/neurocyte/thespian/archive/cead8672b56a258c9348ec61989158130b66f0cd.tar.gz",
+            .hash = "12209ee225a214bb114908e96497721098ea8abe8b5eccab8cbc57e005a7753ffe9c",
         },
         .@"ansi-term" = .{
             .url = "https://github.com/ziglibs/ansi-term/archive/ed0f6c223539c187ba1b54c5cf0cc3b11104188f.tar.gz",
