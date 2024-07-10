@@ -3,24 +3,24 @@
     .version = "0.0.1",
     .dependencies = .{
         .clap = .{
-            .url = "https://github.com/Hejsil/zig-clap/archive/8c98e6404b22aafc0184e999d8f068b81cc22fa1.tar.gz",
-            .hash = "122014e73fd712190e109950837b97f6143f02d7e2b6986e1db70b6f4aadb5ba6a0d",
+            .url = "https://github.com/Hejsil/zig-clap/archive/c0193e9247335a6c1688b946325060289405de2a.tar.gz",
+            .hash = "12207ee987ce045596cb992cfb15b0d6d9456e50d4721c3061c69dabc2962053644d",
         },
         .themes = .{
-            .url = "https://github.com/neurocyte/flow-themes/releases/download/master-63ee1e364ea0a7877e0ece9a309acb75622ff44b/flow-themes.tar.gz",
-            .hash = "1220215680aaaffdbaa570f571d3ade42e241257744571e3d156136be54f58496a54",
+            .url = "https://github.com/neurocyte/flow-themes/releases/download/master-15e8cad1619429bf2547a6819b5b999510d5c1e5/flow-themes.tar.gz",
+            .hash = "1220906d82deb37573207c5d365edb6b58a0b1b3e4ef68902019a23a0eb5e5a34298",
         },
         .syntax = .{
-            .url = "https://github.com/neurocyte/flow-syntax/archive/9ed377279e0723f53e0063f0577fbe17d2f7bd73.tar.gz",
-            .hash = "12208577d504d28012c810f5defb8f8086f46a76203020bccad33925c5b9750fd0a8",
+            .url = "https://github.com/neurocyte/flow-syntax/archive/d476a9a178369822b1d7f3df07e8115980fbbaa7.tar.gz",
+            .hash = "1220efc435c923c4ed6773b92127458f90d8bf0303d49f282996ea32d2505368b37f",
         },
         .thespian = .{
-            .url = "https://github.com/neurocyte/thespian/archive/cead8672b56a258c9348ec61989158130b66f0cd.tar.gz",
-            .hash = "12209ee225a214bb114908e96497721098ea8abe8b5eccab8cbc57e005a7753ffe9c",
+            .url = "https://github.com/neurocyte/thespian/archive/b82d73557966428ac7db1507bb5a4b800ac6207c.tar.gz",
+            .hash = "12206cadbf0fdb7d7c1b7e4e48d9ad48860dced3d5db404cf87f7fa2fa2b5bd287f2",
         },
         .@"ansi-term" = .{
-            .url = "https://github.com/ziglibs/ansi-term/archive/ed0f6c223539c187ba1b54c5cf0cc3b11104188f.tar.gz",
-            .hash = "12200297afdfc2babebdba3b4950ef8a478fd4cf7aea3354644d348739270580afe9",
+            .url = "https://github.com/ziglibs/ansi-term/archive/0bb62115db6749044765fdb37c9791388e7970f2.tar.gz",
+            .hash = "12200719196e0abd325efa248fb03882c8fa2c7130e3ae1d57dbff72afc846b28495",
         },
     },
     .paths = .{
