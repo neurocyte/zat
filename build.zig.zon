@@ -11,8 +11,8 @@
             .hash = "12208fa20104c3311e97c20e70d0a81a257f2c2e24f627616984e38dda309749b29a",
         },
         .syntax = .{
-            .url = "https://github.com/neurocyte/flow-syntax/archive/bd5240d58c5a07932a797e2beb076f70053bb8e9.tar.gz",
-            .hash = "1220080c92e732f48d518043b7a5b09788a00493dece06c9c87e5e6bb6fed96d651a",
+            .url = "https://github.com/neurocyte/flow-syntax/archive/d5b5da509350ef946b33cfb5c04ede68e288545b.tar.gz",
+            .hash = "122074a1a0a073213ae65d3f09863d6cb0622e1dbacf6a85e09a343e306c9da44c3b",
         },
         .thespian = .{
             .url = "https://github.com/neurocyte/thespian/archive/b10131ee5285c6d5598159a3ab108d8a84afc6db.tar.gz",
