@@ -152,9 +152,9 @@ pub fn main() !void {
 
 fn get_parser(a: std.mem.Allocator, content: []const u8, file_path: []const u8) *syntax {
     return (if (lang_override) |name|
-        syntax.create_file_type(a, content, name) catch unknown_file_type(name)
+        syntax.create_file_type(a, name) catch unknown_file_type(name)
     else
-        syntax.create_guess_file_type(a, content, file_path)) catch syntax.create_file_type(a, content, lang_default) catch unknown_file_type(lang_default);
+        syntax.create_guess_file_type(a, content, file_path)) catch syntax.create_file_type(a, lang_default) catch unknown_file_type(lang_default);
 }
 
 fn unknown_file_type(name: []const u8) noreturn {
@@ -193,6 +193,7 @@ fn render_file(
     }
 
     const parser = get_parser(a, content, file_path);
+    try parser.refresh_full(content);
     if (show) {
         try render_file_type(writer, parser.file_type, theme);
         end_line -= 1;
