@@ -392,8 +392,8 @@ fn list_themes(writer: Writer) !void {
 
 fn set_ansi_style(writer: Writer, style: Theme.Style) Writer.Error!void {
     const ansi_style = .{
-        .foreground = if (style.fg) |color| to_rgb_color(color) else .Default,
-        .background = if (style.bg) |color| to_rgb_color(color) else .Default,
+        .foreground = if (style.fg) |color| to_rgb_color(color.color) else .Default,
+        .background = if (style.bg) |color| to_rgb_color(color.color) else .Default,
         .font_style = switch (style.fs orelse .normal) {
             .normal => term.style.FontStyle{},
             .bold => term.style.FontStyle.bold,
@@ -409,8 +409,8 @@ fn set_ansi_style(writer: Writer, style: Theme.Style) Writer.Error!void {
 const unset_ansi_style = set_ansi_style;
 
 fn write_html_preamble(writer: Writer, style: Theme.Style) !void {
-    const color = if (style.fg) |color| color else 0;
-    const background = if (style.bg) |background| background else 0xFFFFFF;
+    const color = if (style.fg) |color| color.color else 0;
+    const background = if (style.bg) |background| background.color else 0xFFFFFF;
     try writer.writeAll("<div style=\"color:");
     try write_hex_color(writer, color);
     try writer.writeAll(";background-color:");
@@ -423,7 +423,7 @@ fn write_html_postamble(writer: Writer) !void {
 }
 
 fn set_html_style(writer: Writer, style: Theme.Style) !void {
-    const color = if (style.fg) |color| color else 0;
+    const color = if (style.fg) |color| color.color else 0;
     try writer.writeAll("<span style=\"color:");
     try write_hex_color(writer, color);
     switch (style.fs orelse .normal) {
@@ -466,7 +466,7 @@ fn render_file_type(writer: Writer, file_type: *const syntax.FileType, theme: *c
     try set_ansi_style(writer, reversed);
     try writer.writeAll("");
     try set_ansi_style(writer, .{
-        .fg = if (file_type.color == 0xFFFFFF or file_type.color == 0x000000) style.fg else file_type.color,
+        .fg = if (file_type.color == 0xFFFFFF or file_type.color == 0x000000) style.fg else .{ .color = file_type.color },
         .bg = style.bg,
     });
     try writer.writeAll(file_type.icon);
