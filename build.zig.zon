@@ -1,6 +1,6 @@
 .{
     .name = "zat",
-    .version = "0.0.1",
+    .version = "1.0.0",
     .dependencies = .{
         .clap = .{
             .url = "https://github.com/Hejsil/zig-clap/archive/c0193e9247335a6c1688b946325060289405de2a.tar.gz",
