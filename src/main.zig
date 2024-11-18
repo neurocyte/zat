@@ -53,8 +53,9 @@ pub fn main() !void {
     };
     defer res.deinit();
 
-    const stdout_file = std.io.getStdOut().writer();
-    var bw = std.io.bufferedWriter(stdout_file);
+    const stdout_file = std.io.getStdOut();
+    const stdout_writer = stdout_file.writer();
+    var bw = std.io.bufferedWriter(stdout_writer);
     const writer = bw.writer();
     defer bw.flush() catch {};
 
@@ -66,6 +67,9 @@ pub fn main() !void {
 
     if (res.args.@"list-languages" != 0)
         return list_langs(writer);
+
+    if (!stdout_file.supportsAnsiEscapeCodes())
+        return plain_cat(res.positionals);
 
     var conf_buf: ?[]const u8 = null;
     const conf = config_loader.read_config(a, &conf_buf);
@@ -103,7 +107,10 @@ pub fn main() !void {
 
     if (res.positionals.len > 0) {
         for (res.positionals) |arg| {
-            const file = try std.fs.cwd().openFile(arg, .{ .mode = .read_only });
+            const file = if (std.mem.eql(u8, arg, "-"))
+                std.io.getStdIn()
+            else
+                try std.fs.cwd().openFile(arg, .{ .mode = .read_only });
             defer file.close();
             const content = try file.readToEndAlloc(a, std.math.maxInt(u32));
             defer a.free(content);
@@ -477,4 +484,28 @@ fn render_file_type(writer: Writer, file_type: *const syntax.FileType, theme: *c
     try writer.writeAll("");
     try set_ansi_style(writer, plain);
     try writer.writeAll("\n");
+}
+
+fn plain_cat(files: []const []const u8) !void {
+    const stdout = std.io.getStdOut();
+    if (files.len == 0) {
+        try plain_cat_file(stdout, "-");
+    } else {
+        for (files) |file| try plain_cat_file(stdout, file);
+    }
+}
+
+fn plain_cat_file(out_file: std.fs.File, in_file_name: []const u8) !void {
+    var in_file = if (std.mem.eql(u8, in_file_name, "-"))
+        std.io.getStdIn()
+    else
+        try std.fs.cwd().openFile(in_file_name, .{});
+    defer in_file.close();
+
+    var buf: [std.mem.page_size]u8 = undefined;
+    while (true) {
+        const bytes_read = try in_file.read(&buf);
+        if (bytes_read == 0) return;
+        try out_file.writeAll(buf[0..bytes_read]);
+    }
 }
