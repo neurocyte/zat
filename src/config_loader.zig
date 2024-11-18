@@ -1,5 +1,6 @@
 const std = @import("std");
 const cbor = @import("cbor");
+const builtin = @import("builtin");
 
 const application_name = "flow";
 
@@ -48,18 +49,36 @@ pub fn get_config_dir() ![]const u8 {
 }
 
 fn get_app_config_dir(appname: []const u8) ![]const u8 {
+    const a = std.heap.c_allocator;
     const local = struct {
         var config_dir_buffer: [std.posix.PATH_MAX]u8 = undefined;
         var config_dir: ?[]const u8 = null;
     };
     const config_dir = if (local.config_dir) |dir|
         dir
-    else if (std.posix.getenv("XDG_CONFIG_HOME")) |xdg|
-        try std.fmt.bufPrint(&local.config_dir_buffer, "{s}/{s}", .{ xdg, appname })
-    else if (std.posix.getenv("HOME")) |home|
-        try std.fmt.bufPrint(&local.config_dir_buffer, "{s}/.config/{s}", .{ home, appname })
-    else
-        return error.AppConfigDirUnavailable;
+    else if (std.process.getEnvVarOwned(a, "XDG_CONFIG_HOME") catch null) |xdg| ret: {
+        defer a.free(xdg);
+        break :ret try std.fmt.bufPrint(&local.config_dir_buffer, "{s}/{s}", .{ xdg, appname });
+    } else if (std.process.getEnvVarOwned(a, "HOME") catch null) |home| ret: {
+        defer a.free(home);
+        const dir = try std.fmt.bufPrint(&local.config_dir_buffer, "{s}/.config", .{home});
+        std.fs.makeDirAbsolute(dir) catch |e| switch (e) {
+            error.PathAlreadyExists => {},
+            else => return e,
+        };
+        break :ret try std.fmt.bufPrint(&local.config_dir_buffer, "{s}/.config/{s}", .{ home, appname });
+    } else if (builtin.os.tag == .windows) ret: {
+        if (std.process.getEnvVarOwned(a, "APPDATA") catch null) |appdata| {
+            defer a.free(appdata);
+            const dir = try std.fmt.bufPrint(&local.config_dir_buffer, "{s}/{s}", .{ appdata, appname });
+            std.fs.makeDirAbsolute(dir) catch |e| switch (e) {
+                error.PathAlreadyExists => {},
+                else => return e,
+            };
+            break :ret dir;
+        } else return error.AppConfigDirUnavailable;
+    } else return error.AppConfigDirUnavailable;
+
     local.config_dir = config_dir;
     std.fs.makeDirAbsolute(config_dir) catch |e| switch (e) {
         error.PathAlreadyExists => {},
