@@ -7,12 +7,12 @@
             .hash = "12207ee987ce045596cb992cfb15b0d6d9456e50d4721c3061c69dabc2962053644d",
         },
         .themes = .{
-            .url = "https://github.com/neurocyte/flow-themes/releases/download/master-5f1ca2fd3c784d430306a5cd1df237681a196333/flow-themes.tar.gz",
-            .hash = "122095b1a6110b920571c7e49e61c124cd9a164fe9b1b0faa1bd11d04d89822d3304",
+            .url = "https://github.com/neurocyte/flow-themes/releases/download/master-618a7801d3383049adfe18cc09f5f5086c66995f/flow-themes.tar.gz",
+            .hash = "1220019ed92f48fb94d4ae82bba17b11d0ba06f17ed31cd66613b3c048b1d2382095",
         },
         .syntax = .{
-            .url = "https://github.com/neurocyte/flow-syntax/archive/ba10d89670e19004bd3b958a407afc087c33ca9f.tar.gz",
-            .hash = "122054eecb1f4c9b669555225c8ae31b419f10231288004eec3247d6854f677a420b",
+            .url = "https://github.com/neurocyte/flow-syntax/archive/28bc77f4615488aaa269c25fc862864f4b3a7460.tar.gz",
+            .hash = "1220abddc10ca8f8b6b5477f8c007948c168504b9dd3516899fe37251890eeabf4ab",
         },
         .thespian = .{
             .url = "https://github.com/neurocyte/thespian/archive/d7dd27116398b17c8ab68327c384885f161d0cc1.tar.gz",
