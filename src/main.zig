@@ -20,6 +20,7 @@ pub fn main() !void {
         \\-t, --theme <name>       Select theme to use.
         \\-d, --default <name>     Set the language to use if guessing failed (default: conf).
         \\-s, --show-language      Show detected language in output.
+        \\-C, --color              Always produce color output, even if stdout is not a tty.
         \\--html                   Output HTML instead of ansi escape codes.
         \\--list-themes            Show available themes.
         \\--list-languages         Show available language parsers.
@@ -68,7 +69,7 @@ pub fn main() !void {
     if (res.args.@"list-languages" != 0)
         return list_langs(writer);
 
-    if (!stdout_file.supportsAnsiEscapeCodes())
+    if (res.args.color == 0 and !stdout_file.supportsAnsiEscapeCodes())
         return plain_cat(res.positionals);
 
     var conf_buf: ?[]const u8 = null;
