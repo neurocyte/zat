@@ -15,4 +15,4 @@ rg \
         --layout=reverse \
         --ansi \
         --tiebreak=index \
-        --preview 'zat --highlight {2} --limit $FZF_PREVIEW_LINES {1}'
+        --preview 'zat --color --highlight {2} --limit $FZF_PREVIEW_LINES {1}'
