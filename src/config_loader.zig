@@ -31,7 +31,7 @@ fn read_json_config_file(a: std.mem.Allocator, file_name: []const u8, buf: *?[]c
         var found = false;
         var field_name: []const u8 = undefined;
         if (!(try cbor.matchString(&iter, &field_name))) return error.InvalidConfig;
-        inline for (@typeInfo(config).Struct.fields) |field_info| {
+        inline for (@typeInfo(config).@"struct".fields) |field_info| {
             if (std.mem.eql(u8, field_name, field_info.name)) {
                 var value: field_info.type = undefined;
                 if (!(try cbor.matchValue(&iter, cbor.extract(&value)))) return error.InvalidConfig;

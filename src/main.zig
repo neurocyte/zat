@@ -3,7 +3,7 @@ const clap = @import("clap");
 const syntax = @import("syntax");
 const Theme = @import("theme");
 const themes = @import("themes");
-const term = @import("ansi-term");
+const term = @import("ansi_term");
 const config_loader = @import("config_loader.zig");
 
 const Writer = std.io.BufferedWriter(4096, std.fs.File.Writer).Writer;
@@ -70,7 +70,7 @@ pub fn main() !void {
         return list_langs(writer);
 
     if (res.args.color == 0 and !stdout_file.supportsAnsiEscapeCodes())
-        return plain_cat(res.positionals);
+        return plain_cat(res.positionals[0]);
 
     var conf_buf: ?[]const u8 = null;
     const conf = config_loader.read_config(a, &conf_buf);
@@ -106,8 +106,8 @@ pub fn main() !void {
     if (res.args.html != 0)
         try write_html_preamble(writer, theme.editor);
 
-    if (res.positionals.len > 0) {
-        for (res.positionals) |arg| {
+    if (res.positionals[0].len > 0) {
+        for (res.positionals[0]) |arg| {
             const file = if (std.mem.eql(u8, arg, "-"))
                 std.io.getStdIn()
             else
@@ -158,11 +158,11 @@ pub fn main() !void {
         try write_html_postamble(writer);
 }
 
-fn get_parser(a: std.mem.Allocator, content: []const u8, file_path: []const u8) *syntax {
+fn get_parser(a: std.mem.Allocator, content: []const u8, file_path: []const u8, query_cache: *syntax.QueryCache) *syntax {
     return (if (lang_override) |name|
-        syntax.create_file_type(a, name) catch unknown_file_type(name)
+        syntax.create_file_type(a, name, query_cache) catch unknown_file_type(name)
     else
-        syntax.create_guess_file_type(a, content, file_path)) catch syntax.create_file_type(a, lang_default) catch unknown_file_type(lang_default);
+        syntax.create_guess_file_type(a, content, file_path, query_cache)) catch syntax.create_file_type(a, lang_default, query_cache) catch unknown_file_type(lang_default);
 }
 
 fn unknown_file_type(name: []const u8) noreturn {
@@ -200,7 +200,8 @@ fn render_file(
         end_line = start_line + lines;
     }
 
-    const parser = get_parser(a, content, file_path);
+    const query_cache = try syntax.QueryCache.create(a, .{});
+    const parser = get_parser(a, content, file_path, query_cache);
     try parser.refresh_full(content);
     if (show) {
         try render_file_type(writer, parser.file_type, theme);
@@ -399,16 +400,16 @@ fn list_themes(writer: Writer) !void {
 }
 
 fn set_ansi_style(writer: Writer, style: Theme.Style) Writer.Error!void {
-    const ansi_style = .{
+    const ansi_style: term.style.Style = .{
         .foreground = if (style.fg) |color| to_rgb_color(color.color) else .Default,
         .background = if (style.bg) |color| to_rgb_color(color.color) else .Default,
         .font_style = switch (style.fs orelse .normal) {
             .normal => term.style.FontStyle{},
-            .bold => term.style.FontStyle.bold,
-            .italic => term.style.FontStyle.italic,
-            .underline => term.style.FontStyle.underline,
-            .undercurl => term.style.FontStyle.underline,
-            .strikethrough => term.style.FontStyle.crossedout,
+            .bold => term.style.FontStyle{ .bold = true },
+            .italic => term.style.FontStyle{ .italic = true },
+            .underline => term.style.FontStyle{ .underline = true },
+            .undercurl => term.style.FontStyle{ .underline = true },
+            .strikethrough => term.style.FontStyle{ .crossedout = true },
         },
     };
     try term.format.updateStyle(writer, ansi_style, null);
@@ -503,7 +504,7 @@ fn plain_cat_file(out_file: std.fs.File, in_file_name: []const u8) !void {
         try std.fs.cwd().openFile(in_file_name, .{});
     defer in_file.close();
 
-    var buf: [std.mem.page_size]u8 = undefined;
+    var buf: [std.heap.page_size_min]u8 = undefined;
     while (true) {
         const bytes_read = try in_file.read(&buf);
         if (bytes_read == 0) return;
