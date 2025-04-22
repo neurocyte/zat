@@ -86,12 +86,14 @@ pub fn build_exe(
     strip: bool,
     pie: ?bool,
 ) void {
-
     const clap_dep = b.dependency("clap", .{ .target = target, .optimize = optimize });
-    const ansi_term_dep = b.dependency("ansi-term", .{ .target = target, .optimize = optimize });
+    const ansi_term_dep = b.dependency("ansi_term", .{ .target = target, .optimize = optimize });
     const themes_dep = b.dependency("themes", .{});
     const syntax_dep = b.dependency("syntax", .{ .target = target, .optimize = optimize });
-    const thespian_dep = b.dependency("thespian", .{});
+    const cbor_dep = syntax_dep.builder.dependency("cbor", .{
+        .target = target,
+        .optimize = optimize,
+    });
 
     const exe = b.addExecutable(.{
         .name = "zat",
@@ -105,8 +107,8 @@ pub fn build_exe(
     exe.root_module.addImport("theme", themes_dep.module("theme"));
     exe.root_module.addImport("themes", themes_dep.module("themes"));
     exe.root_module.addImport("clap", clap_dep.module("clap"));
-    exe.root_module.addImport("ansi-term", ansi_term_dep.module("ansi-term"));
-    exe.root_module.addImport("cbor", b.createModule(.{ .root_source_file = thespian_dep.path("src/cbor.zig") }));
+    exe.root_module.addImport("ansi_term", ansi_term_dep.module("ansi_term"));
+    exe.root_module.addImport("cbor", cbor_dep.module("cbor"));
     const exe_install = b.addInstallArtifact(exe, exe_install_options);
     b.getInstallStep().dependOn(&exe_install.step);
 
