@@ -13,6 +13,11 @@ var lang_override: ?[]const u8 = null;
 var lang_default: []const u8 = "conf";
 const no_highlight = std.math.maxInt(usize);
 
+const builtin = @import("builtin");
+pub const std_options: std.Options = .{
+    .log_level = if (builtin.mode == .Debug) .info else .err,
+};
+
 pub fn main() !void {
     const params = comptime clap.parseParamsComptime(
         \\-h, --help               Display this help and exit.
@@ -72,8 +77,8 @@ pub fn main() !void {
     if (res.args.color == 0 and !stdout_file.supportsAnsiEscapeCodes())
         return plain_cat(res.positionals[0]);
 
-    var conf_buf: ?[]const u8 = null;
-    const conf = config_loader.read_config(a, &conf_buf);
+    const conf, const conf_bufs = config_loader.read_config(a);
+    defer config_loader.free_config(a, conf_bufs);
     const theme_name = if (res.args.theme) |theme| theme else conf.theme;
     const limit_lines = res.args.limit;
 
