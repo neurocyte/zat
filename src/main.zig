@@ -94,14 +94,15 @@ pub fn main() !void {
     }
 
     if (highlight_line_end < highlight_line_start) {
-        try std.io.getStdErr().writer().print("invalid range\n", .{});
+        std.log.err("invalid range", .{});
         std.process.exit(1);
     }
 
-    const theme = get_theme_by_name(theme_name) orelse {
-        try std.io.getStdErr().writer().print("theme \"{s}\" not found\n", .{theme_name});
+    const theme, const parsed_theme = config_loader.get_theme_by_name(a, theme_name) orelse {
+        std.log.err("theme \"{s}\" not found", .{theme_name});
         std.process.exit(1);
     };
+    _ = parsed_theme;
 
     const set_style: StyleFn = if (res.args.html != 0) set_html_style else set_ansi_style;
     const unset_style: StyleFn = if (res.args.html != 0) unset_html_style else unset_ansi_style;
@@ -174,7 +175,7 @@ fn get_parser(a: std.mem.Allocator, content: []const u8, file_path: []const u8, 
 }
 
 fn unknown_file_type(name: []const u8) noreturn {
-    std.io.getStdErr().writer().print("unknown file type \'{s}\'\n", .{name}) catch {};
+    std.log.err("unknown file type \'{s}\'\n", .{name});
     std.process.exit(1);
 }
 
@@ -390,14 +391,6 @@ pub const fallbacks: []const FallBack = &[_]FallBack{
     .{ .ts = "repeat", .tm = "keyword.control.flow" },
     .{ .ts = "field", .tm = "variable" },
 };
-
-fn get_theme_by_name(name: []const u8) ?Theme {
-    for (themes.themes) |theme| {
-        if (std.mem.eql(u8, theme.name, name))
-            return theme;
-    }
-    return null;
-}
 
 fn list_themes(writer: Writer) !void {
     var max_name_len: usize = 0;

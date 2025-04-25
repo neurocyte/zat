@@ -1,5 +1,7 @@
 const std = @import("std");
 const cbor = @import("cbor");
+const Theme = @import("theme");
+const themes = @import("themes");
 const builtin = @import("builtin");
 
 const application_name = "flow";
@@ -193,8 +195,6 @@ fn get_app_config_dir(appname: []const u8) ConfigDirError![]const u8 {
     return config_dir;
 }
 
-const theme_dir = "themes";
-
 fn get_app_config_file_name(appname: []const u8, comptime base_name: []const u8) ConfigDirError![]const u8 {
     return get_app_config_dir_file_name(appname, base_name ++ ".json");
 }
@@ -204,4 +204,61 @@ fn get_app_config_dir_file_name(appname: []const u8, comptime config_file_name: 
         var config_file_buffer: [std.posix.PATH_MAX]u8 = undefined;
     };
     return std.fmt.bufPrint(&local.config_file_buffer, "{s}/{s}", .{ try get_app_config_dir(appname), config_file_name });
+}
+
+const theme_dir = "themes";
+
+fn get_theme_directory() ![]const u8 {
+    const local = struct {
+        var dir_buffer: [std.posix.PATH_MAX]u8 = undefined;
+    };
+    const a = std.heap.c_allocator;
+    if (std.process.getEnvVarOwned(a, "FLOW_THEMES_DIR") catch null) |dir| {
+        defer a.free(dir);
+        return try std.fmt.bufPrint(&local.dir_buffer, "{s}", .{dir});
+    }
+    return try std.fmt.bufPrint(&local.dir_buffer, "{s}/{s}", .{ try get_app_config_dir(application_name), theme_dir });
+}
+
+pub fn get_theme_file_name(theme_name: []const u8) ![]const u8 {
+    const dir = try get_theme_directory();
+    const local = struct {
+        var file_buffer: [std.posix.PATH_MAX]u8 = undefined;
+    };
+    return try std.fmt.bufPrint(&local.file_buffer, "{s}/{s}.json", .{ dir, theme_name });
+}
+
+fn read_theme(allocator: std.mem.Allocator, theme_name: []const u8) ?[]const u8 {
+    const file_name = get_theme_file_name(theme_name) catch return null;
+    var file = std.fs.openFileAbsolute(file_name, .{ .mode = .read_only }) catch return null;
+    defer file.close();
+    return file.readToEndAlloc(allocator, 64 * 1024) catch null;
+}
+
+fn load_theme_file(allocator: std.mem.Allocator, theme_name: []const u8) !?std.json.Parsed(Theme) {
+    return load_theme_file_internal(allocator, theme_name) catch |e| {
+        std.log.err("loaded theme from file failed: {}", .{e});
+        return e;
+    };
+}
+
+fn load_theme_file_internal(allocator: std.mem.Allocator, theme_name: []const u8) !?std.json.Parsed(Theme) {
+    _ = std.json.Scanner;
+    const json_str = read_theme(allocator, theme_name) orelse return null;
+    defer allocator.free(json_str);
+    return try std.json.parseFromSlice(Theme, allocator, json_str, .{ .allocate = .alloc_always });
+}
+
+pub fn get_theme_by_name(allocator: std.mem.Allocator, name: []const u8) ?struct { Theme, ?std.json.Parsed(Theme) } {
+    if (load_theme_file(allocator, name) catch null) |parsed_theme| {
+        std.log.info("loaded theme from file: {s}", .{name});
+        return .{ parsed_theme.value, parsed_theme };
+    }
+
+    std.log.info("loading theme: {s}", .{name});
+    for (themes.themes) |theme_| {
+        if (std.mem.eql(u8, theme_.name, name))
+            return .{ theme_, null };
+    }
+    return null;
 }
