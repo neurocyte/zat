@@ -25,6 +25,7 @@ pub fn main() !void {
         \\-t, --theme <name>       Select theme to use.
         \\-d, --default <name>     Set the language to use if guessing failed (default: conf).
         \\-s, --show-language      Show detected language in output.
+        \\-T, --show-theme         Show selected theme in output.
         \\-C, --color              Always produce color output, even if stdout is not a tty.
         \\--html                   Output HTML instead of ansi escape codes.
         \\--list-themes            Show available themes.
@@ -77,7 +78,7 @@ pub fn main() !void {
     if (res.args.color == 0 and !stdout_file.supportsAnsiEscapeCodes())
         return plain_cat(res.positionals[0]);
 
-    const conf, const conf_bufs = config_loader.read_config(a);
+    const conf, const conf_bufs = config_loader.read_config(@import("config.zig"), a);
     defer config_loader.free_config(a, conf_bufs);
     const theme_name = if (res.args.theme) |theme| theme else conf.theme;
     const limit_lines = res.args.limit;
@@ -127,6 +128,7 @@ pub fn main() !void {
                 arg,
                 &theme,
                 res.args.@"show-language" != 0,
+                res.args.@"show-theme" != 0,
                 set_style,
                 unset_style,
                 highlight_line_start,
@@ -148,6 +150,7 @@ pub fn main() !void {
             "-",
             &theme,
             res.args.@"show-language" != 0,
+            res.args.@"show-theme" != 0,
             set_style,
             unset_style,
             highlight_line_start,
@@ -183,7 +186,8 @@ fn render_file(
     content: []const u8,
     file_path: []const u8,
     theme: *const Theme,
-    show: bool,
+    show_file_type: bool,
+    show_theme: bool,
     set_style: StyleFn,
     unset_style: StyleFn,
     highlight_line_start: usize,
@@ -208,8 +212,12 @@ fn render_file(
     const query_cache = try syntax.QueryCache.create(a, .{});
     const parser = get_parser(a, content, file_path, query_cache);
     try parser.refresh_full(content);
-    if (show) {
+    if (show_file_type) {
         try render_file_type(writer, parser.file_type, theme);
+        end_line -= 1;
+    }
+    if (show_theme) {
+        try render_theme_indicator(writer, theme);
         end_line -= 1;
     }
 
@@ -487,6 +495,20 @@ fn render_file_type(writer: Writer, file_type: *const syntax.FileType, theme: *c
     try writer.writeAll(" ");
     try set_ansi_style(writer, style);
     try writer.writeAll(file_type.name);
+    try set_ansi_style(writer, reversed);
+    try writer.writeAll("");
+    try set_ansi_style(writer, plain);
+    try writer.writeAll("\n");
+}
+
+fn render_theme_indicator(writer: Writer, theme: *const Theme) !void {
+    const style = Theme.Style{ .bg = theme.editor_selection.bg, .fg = theme.editor.fg };
+    const reversed = Theme.Style{ .fg = theme.editor_selection.bg };
+    const plain: Theme.Style = Theme.Style{ .fg = theme.editor.fg };
+    try set_ansi_style(writer, reversed);
+    try writer.writeAll("");
+    try set_ansi_style(writer, style);
+    try writer.writeAll(theme.name);
     try set_ansi_style(writer, reversed);
     try writer.writeAll("");
     try set_ansi_style(writer, plain);
