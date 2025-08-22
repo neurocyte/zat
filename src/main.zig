@@ -167,11 +167,14 @@ pub fn main() !void {
         try write_html_postamble(writer);
 }
 
-fn get_parser(a: std.mem.Allocator, content: []const u8, file_path: []const u8, query_cache: *syntax.QueryCache) *syntax {
-    return (if (lang_override) |name|
-        syntax.create_file_type(a, name, query_cache) catch unknown_file_type(name)
-    else
-        syntax.create_guess_file_type(a, content, file_path, query_cache)) catch syntax.create_file_type(a, lang_default, query_cache) catch unknown_file_type(lang_default);
+fn get_parser(a: std.mem.Allocator, content: []const u8, file_path: []const u8, query_cache: *syntax.QueryCache) struct { syntax.FileType, *syntax } {
+    return if (lang_override) |name| blk: {
+        const file_type = syntax.FileType.get_by_name_static(name) orelse unknown_file_type(lang_default);
+        break :blk .{ file_type, syntax.create(file_type, a, query_cache) catch unknown_file_type(name) };
+    } else blk: {
+        const file_type = syntax.FileType.guess_static(file_path, content) orelse unknown_file_type(lang_default);
+        break :blk .{ file_type, syntax.create(file_type, a, query_cache) catch unknown_file_type(lang_default) };
+    };
 }
 
 fn unknown_file_type(name: []const u8) noreturn {
@@ -211,10 +214,10 @@ fn render_file(
     }
 
     const query_cache = try syntax.QueryCache.create(a, .{});
-    const parser = get_parser(a, content, file_path, query_cache);
+    const file_type, const parser = get_parser(a, content, file_path, query_cache);
     try parser.refresh_full(content);
     if (show_file_type) {
-        try render_file_type(writer, parser.file_type, theme);
+        try render_file_type(writer, &file_type, theme);
         end_line -= 1;
     }
     if (show_theme) {
@@ -468,7 +471,7 @@ fn write_hex_color(writer: Writer, color: u24) !void {
 }
 
 fn list_langs(writer: Writer) !void {
-    for (syntax.FileType.file_types) |file_type| {
+    for (syntax.FileType.get_all()) |file_type| {
         try writer.writeAll(file_type.name);
         try writer.writeAll("\n");
     }

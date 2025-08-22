@@ -12,8 +12,8 @@
             .hash = "N-V-__8AAJiAIgDMVIi8CRb_xko9_qVQ-UiQzd5FTBBr0aPa",
         },
         .syntax = .{
-            .url = "https://github.com/neurocyte/flow-syntax/archive/fa6a411bc769882acc87cf0d961af3813abf2eac.tar.gz",
-            .hash = "flow_syntax-0.1.0-X8jOof39AADK25RT1Bst_x7aUIwHbh7y09PJXBghLu_b",
+            .url = "git+https://github.com/neurocyte/flow-syntax?ref=zig-0.14#410d19e633f237cd1602175450bd7d3bb03a1898",
+            .hash = "flow_syntax-0.1.0-X8jOoT4OAQDibKKzYlJls3u5KczVh__cWYN7vTqCE1o3",
         },
         .ansi_term = .{
             .url = "https://github.com/ziglibs/ansi-term/archive/c0e6ad093d4f6a9ed4e65d962d1e53b97888f989.tar.gz",
