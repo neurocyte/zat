@@ -169,10 +169,12 @@ pub fn main() !void {
 
 fn get_parser(a: std.mem.Allocator, content: []const u8, file_path: []const u8, query_cache: *syntax.QueryCache) struct { syntax.FileType, *syntax } {
     return if (lang_override) |name| blk: {
-        const file_type = syntax.FileType.get_by_name_static(name) orelse unknown_file_type(lang_default);
+        const file_type = syntax.FileType.get_by_name_static(name) orelse unknown_file_type(name);
         break :blk .{ file_type, syntax.create(file_type, a, query_cache) catch unknown_file_type(name) };
     } else blk: {
-        const file_type = syntax.FileType.guess_static(file_path, content) orelse unknown_file_type(lang_default);
+        const file_type = syntax.FileType.guess_static(file_path, content) orelse
+            syntax.FileType.get_by_name_static(lang_default) orelse
+            unknown_file_type(lang_default);
         break :blk .{ file_type, syntax.create(file_type, a, query_cache) catch unknown_file_type(lang_default) };
     };
 }
