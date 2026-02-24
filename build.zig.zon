@@ -13,8 +13,8 @@
             .hash = "N-V-__8AAK88IwAuRxgh-x0ikK2KRhXCvCg8joy5mLlH0Ffk",
         },
         .syntax = .{
-            .url = "git+https://github.com/neurocyte/flow-syntax?ref=zig-0.14#410d19e633f237cd1602175450bd7d3bb03a1898",
-            .hash = "flow_syntax-0.1.0-X8jOoT4OAQDibKKzYlJls3u5KczVh__cWYN7vTqCE1o3",
+            .url = "git+https://github.com/neurocyte/flow-syntax?ref=master#02c26ba48fbc962058097feb53dd15f2750b6dc9",
+            .hash = "flow_syntax-0.7.2-X8jOobBCAQArXM2P0pqy2RXieTrYu2RbCo7FOO8NWvfv",
         },
         .ansi_term = .{
             .url = "https://github.com/ziglibs/ansi-term/archive/c0e6ad093d4f6a9ed4e65d962d1e53b97888f989.tar.gz",
