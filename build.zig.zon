@@ -1,6 +1,7 @@
 .{
     .name = .zat,
     .version = "1.0.0",
+    .minimum_zig_version = "0.15.2",
     .fingerprint = 0x8da9db57fa011a09,
     .dependencies = .{
         .clap = .{
