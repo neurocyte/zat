@@ -1,20 +1,20 @@
 .{
     .name = .zat,
     .version = "1.0.0",
-    .minimum_zig_version = "0.15.2",
+    .minimum_zig_version = "0.16.0",
     .fingerprint = 0x8da9db57fa011a09,
     .dependencies = .{
         .clap = .{
-            .url = "https://github.com/Hejsil/zig-clap/archive/0.10.0.tar.gz",
-            .hash = "clap-0.10.0-oBajB434AQBDh-Ei3YtoKIRxZacVPF1iSwp3IX_ZB8f0",
+            .url = "git+https://github.com/Hejsil/zig-clap?ref=master#fc1e5cc3f6d9d3001112385ee6256d694e959d2f",
+            .hash = "clap-0.11.0-oBajB7foAQC3Iyn4IVCkUdYaOVVng5IZkSncySTjNig1",
         },
         .themes = .{
-            .url = "https://github.com/neurocyte/flow-themes/releases/download/master-3d26d97bed7e603f3c3846cf5328e3e845df727c/flow-themes.tar.gz",
-            .hash = "N-V-__8AAK88IwAuRxgh-x0ikK2KRhXCvCg8joy5mLlH0Ffk",
+            .url = "https://github.com/neurocyte/flow-themes/releases/download/master-9114e2d9ff4e01064ba1da4f780b0c5448b0f0ef/flow-themes.tar.gz",
+            .hash = "N-V-__8AAJZfLAAP6zSuW13nEIrBBHZM9pbeMRwhvQ-8qqx1",
         },
         .syntax = .{
-            .url = "git+https://github.com/neurocyte/flow-syntax?ref=master#02c26ba48fbc962058097feb53dd15f2750b6dc9",
-            .hash = "flow_syntax-0.7.2-X8jOobBCAQArXM2P0pqy2RXieTrYu2RbCo7FOO8NWvfv",
+            .url = "git+https://github.com/neurocyte/flow-syntax?ref=master#fd10951562892a8f0f507140ada1dda201445cd6",
+            .hash = "flow_syntax-0.7.2-X8jOoZJcAQDG_jcA_FMqGZ98xjrrq7W-GscGocAKzfsM",
         },
         .ansi_term = .{
             .url = "https://github.com/ziglibs/ansi-term/archive/c0e6ad093d4f6a9ed4e65d962d1e53b97888f989.tar.gz",

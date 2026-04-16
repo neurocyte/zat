@@ -6,7 +6,7 @@ const themes = @import("themes");
 const term = @import("ansi_term");
 const config_loader = @import("config_loader.zig");
 
-const Writer = std.io.BufferedWriter(4096, std.fs.File.Writer).Writer;
+const Writer = std.Io.Writer;
 const StyleCache = std.AutoHashMap(u32, ?Theme.Token);
 var style_cache: StyleCache = undefined;
 var lang_override: ?[]const u8 = null;
@@ -18,7 +18,7 @@ pub const std_options: std.Options = .{
     .log_level = if (builtin.mode == .Debug) .info else .err,
 };
 
-pub fn main() !void {
+pub fn main(init: std.process.Init) !void {
     const params = comptime clap.parseParamsComptime(
         \\-h, --help               Display this help and exit.
         \\-l, --language <name>    Override the language.
@@ -38,9 +38,13 @@ pub fn main() !void {
         \\
     );
 
-    var gpa: std.heap.GeneralPurposeAllocator(.{}) = .{};
-    const a = gpa.allocator();
+    const a = init.gpa;
     style_cache = StyleCache.init(a);
+
+    var stderr_buf: [4096]u8 = undefined;
+    var stderr_file = std.Io.File.writer(std.Io.File.stderr(), init.io, &stderr_buf);
+    const stderr = &stderr_file.interface;
+    defer stderr_file.flush() catch {};
 
     const parsers = comptime .{
         .name = clap.parsers.string,
@@ -49,36 +53,38 @@ pub fn main() !void {
         .lines = clap.parsers.int(usize, 10),
     };
     var diag = clap.Diagnostic{};
-    var res = clap.parse(clap.Help, &params, parsers, .{
+    var res = clap.parse(clap.Help, &params, parsers, init.minimal.args, .{
         .diagnostic = &diag,
         .allocator = a,
     }) catch |err| {
-        diag.report(std.io.getStdErr().writer(), err) catch {};
-        clap.help(std.io.getStdErr().writer(), clap.Help, &params, .{}) catch {};
+        diag.report(stderr, err) catch {};
+        clap.help(stderr, clap.Help, &params, .{}) catch {};
         std.process.exit(1);
         return err;
     };
     defer res.deinit();
 
-    const stdout_file = std.io.getStdOut();
-    const stdout_writer = stdout_file.writer();
-    var bw = std.io.bufferedWriter(stdout_writer);
-    const writer = bw.writer();
-    defer bw.flush() catch {};
+    var stdout_buf: [4096]u8 = undefined;
+    var stdout_file = std.Io.File.writer(std.Io.File.stdout(), init.io, &stdout_buf);
+    const stdout = &stdout_file.interface;
+    defer stdout_file.flush() catch {};
 
     if (res.args.help != 0)
-        return clap.help(std.io.getStdErr().writer(), clap.Help, &params, .{});
+        return clap.help(stderr, clap.Help, &params, .{});
 
     if (res.args.@"list-themes" != 0)
-        return list_themes(writer);
+        return list_themes(stdout);
 
     if (res.args.@"list-languages" != 0)
-        return list_langs(writer);
+        return list_langs(stdout);
 
-    if (res.args.color == 0 and !stdout_file.supportsAnsiEscapeCodes())
-        return plain_cat(res.positionals[0]);
+    if (res.args.color == 0) {
+        const tty_mode = std.Io.Terminal.Mode.detect(init.io, std.Io.File.stdout(), false, false) catch .no_color;
+        if (tty_mode == .no_color)
+            return plain_cat(init.io, stdout, res.positionals[0]);
+    }
 
-    const conf, const conf_bufs = config_loader.read_config(@import("config.zig"), a);
+    const conf, const conf_bufs = config_loader.read_config(init.io, init.environ_map, @import("config.zig"), a);
     defer config_loader.free_config(a, conf_bufs);
     const theme_name = if (res.args.theme) |theme| theme else conf.theme;
     const limit_lines = res.args.limit;
@@ -98,7 +104,7 @@ pub fn main() !void {
         std.process.exit(1);
     }
 
-    const theme, const parsed_theme = config_loader.get_theme_by_name(a, theme_name) orelse {
+    const theme, const parsed_theme = config_loader.get_theme_by_name(init.io, init.environ_map, a, theme_name) orelse {
         std.log.err("theme \"{s}\" not found", .{theme_name});
         std.process.exit(1);
     };
@@ -111,20 +117,23 @@ pub fn main() !void {
     if (res.args.default) |default| lang_default = default;
 
     if (res.args.html != 0)
-        try write_html_preamble(writer, theme.editor);
+        try write_html_preamble(stdout, theme.editor);
 
     if (res.positionals[0].len > 0) {
         for (res.positionals[0]) |arg| {
             const file = if (std.mem.eql(u8, arg, "-"))
-                std.io.getStdIn()
+                std.Io.File.stdin()
             else
-                try std.fs.cwd().openFile(arg, .{ .mode = .read_only });
-            defer file.close();
-            const content = try file.readToEndAlloc(a, std.math.maxInt(u32));
+                try std.Io.Dir.cwd().openFile(init.io, arg, .{ .mode = .read_only });
+            defer file.close(init.io);
+            var file_read_buf: [4096]u8 = undefined;
+            var file_rdr = std.Io.File.reader(file, init.io, &file_read_buf);
+            const content = try file_rdr.interface.allocRemaining(a, .limited(std.math.maxInt(u32)));
             defer a.free(content);
             render_file(
+                init.io,
                 a,
-                writer,
+                stdout,
                 content,
                 arg,
                 &theme,
@@ -139,14 +148,16 @@ pub fn main() !void {
                 error.Stop => return,
                 else => return e,
             };
-            try bw.flush();
         }
     } else {
-        const content = try std.io.getStdIn().readToEndAlloc(a, std.math.maxInt(u32));
+        var stdin_read_buf: [4096]u8 = undefined;
+        var stdin_rdr = std.Io.File.reader(std.Io.File.stdin(), init.io, &stdin_read_buf);
+        const content = try stdin_rdr.interface.allocRemaining(a, .limited(std.math.maxInt(u32)));
         defer a.free(content);
         render_file(
+            init.io,
             a,
-            writer,
+            stdout,
             content,
             "-",
             &theme,
@@ -164,7 +175,7 @@ pub fn main() !void {
     }
 
     if (res.args.html != 0)
-        try write_html_postamble(writer);
+        try write_html_postamble(stdout);
 }
 
 fn get_parser(a: std.mem.Allocator, content: []const u8, file_path: []const u8, query_cache: *syntax.QueryCache) struct { syntax.FileType, *syntax } {
@@ -184,11 +195,12 @@ fn unknown_file_type(name: []const u8) noreturn {
     std.process.exit(1);
 }
 
-const StyleFn = *const fn (writer: Writer, style: Theme.Style) Writer.Error!void;
+const StyleFn = *const fn (writer: *Writer, style: Theme.Style) Writer.Error!void;
 
 fn render_file(
+    io: std.Io,
     a: std.mem.Allocator,
-    writer: Writer,
+    writer: *Writer,
     content: []const u8,
     file_path: []const u8,
     theme: *const Theme,
@@ -215,7 +227,7 @@ fn render_file(
         end_line = start_line + lines;
     }
 
-    const query_cache = try syntax.QueryCache.create(a, .{});
+    const query_cache = try syntax.QueryCache.create(io, a, .{});
     const file_type, const parser = get_parser(a, content, file_path, query_cache);
     try parser.refresh_full(content);
     if (show_file_type) {
@@ -397,20 +409,21 @@ pub const fallbacks: []const FallBack = &[_]FallBack{
     .{ .ts = "field", .tm = "variable" },
 };
 
-fn list_themes(writer: Writer) !void {
+fn list_themes(writer: *Writer) !void {
     var max_name_len: usize = 0;
     for (themes.themes) |theme|
         max_name_len = @max(max_name_len, theme.name.len);
 
     for (themes.themes) |theme| {
         try writer.writeAll(theme.name);
-        try writer.writeByteNTimes(' ', max_name_len + 2 - theme.name.len);
+        for (0..max_name_len + 2 - theme.name.len) |_|
+            try writer.writeByte(' ');
         try writer.writeAll(theme.description);
         try writer.writeAll("\n");
     }
 }
 
-fn set_ansi_style(writer: Writer, style: Theme.Style) Writer.Error!void {
+fn set_ansi_style(writer: *Writer, style: Theme.Style) Writer.Error!void {
     const ansi_style: term.style.Style = .{
         .foreground = if (style.fg) |color| to_rgb_color(color.color) else .Default,
         .background = if (style.bg) |color| to_rgb_color(color.color) else .Default,
@@ -428,7 +441,7 @@ fn set_ansi_style(writer: Writer, style: Theme.Style) Writer.Error!void {
 
 const unset_ansi_style = set_ansi_style;
 
-fn write_html_preamble(writer: Writer, style: Theme.Style) !void {
+fn write_html_preamble(writer: *Writer, style: Theme.Style) !void {
     const color = if (style.fg) |color| color.color else 0;
     const background = if (style.bg) |background| background.color else 0xFFFFFF;
     try writer.writeAll("<div style=\"color:");
@@ -438,11 +451,11 @@ fn write_html_preamble(writer: Writer, style: Theme.Style) !void {
     try writer.writeAll(";\"><pre>");
 }
 
-fn write_html_postamble(writer: Writer) !void {
+fn write_html_postamble(writer: *Writer) !void {
     try writer.writeAll("</pre></div>");
 }
 
-fn set_html_style(writer: Writer, style: Theme.Style) !void {
+fn set_html_style(writer: *Writer, style: Theme.Style) !void {
     const color = if (style.fg) |color| color.color else 0;
     try writer.writeAll("<span style=\"color:");
     try write_hex_color(writer, color);
@@ -457,7 +470,7 @@ fn set_html_style(writer: Writer, style: Theme.Style) !void {
     try writer.writeAll(";\">");
 }
 
-fn unset_html_style(writer: Writer, _: Theme.Style) !void {
+fn unset_html_style(writer: *Writer, _: Theme.Style) !void {
     try writer.writeAll("</span>");
 }
 
@@ -468,18 +481,18 @@ fn to_rgb_color(color: u24) term.style.Color {
     return .{ .RGB = .{ .r = r, .g = g, .b = b } };
 }
 
-fn write_hex_color(writer: Writer, color: u24) !void {
+fn write_hex_color(writer: *Writer, color: u24) !void {
     try writer.print("#{x:0>6}", .{color});
 }
 
-fn list_langs(writer: Writer) !void {
+fn list_langs(writer: *Writer) !void {
     for (syntax.FileType.get_all()) |file_type| {
         try writer.writeAll(file_type.name);
         try writer.writeAll("\n");
     }
 }
 
-fn render_file_type(writer: Writer, file_type: *const syntax.FileType, theme: *const Theme) !void {
+fn render_file_type(writer: *Writer, file_type: *const syntax.FileType, theme: *const Theme) !void {
     const style = theme.editor_selection;
     const reversed = Theme.Style{ .fg = theme.editor_selection.bg };
     const plain: Theme.Style = Theme.Style{ .fg = theme.editor.fg };
@@ -499,7 +512,7 @@ fn render_file_type(writer: Writer, file_type: *const syntax.FileType, theme: *c
     try writer.writeAll("\n");
 }
 
-fn render_theme_indicator(writer: Writer, theme: *const Theme) !void {
+fn render_theme_indicator(writer: *Writer, theme: *const Theme) !void {
     const style = Theme.Style{ .bg = theme.editor_selection.bg, .fg = theme.editor.fg };
     const reversed = Theme.Style{ .fg = theme.editor_selection.bg };
     const plain: Theme.Style = Theme.Style{ .fg = theme.editor.fg };
@@ -513,26 +526,22 @@ fn render_theme_indicator(writer: Writer, theme: *const Theme) !void {
     try writer.writeAll("\n");
 }
 
-fn plain_cat(files: []const []const u8) !void {
-    const stdout = std.io.getStdOut();
+fn plain_cat(io: std.Io, stdout: *Writer, files: []const []const u8) !void {
     if (files.len == 0) {
-        try plain_cat_file(stdout, "-");
+        try plain_cat_file(io, stdout, "-");
     } else {
-        for (files) |file| try plain_cat_file(stdout, file);
+        for (files) |file| try plain_cat_file(io, stdout, file);
     }
 }
 
-fn plain_cat_file(out_file: std.fs.File, in_file_name: []const u8) !void {
+fn plain_cat_file(io: std.Io, stdout: *Writer, in_file_name: []const u8) !void {
     var in_file = if (std.mem.eql(u8, in_file_name, "-"))
-        std.io.getStdIn()
+        std.Io.File.stdin()
     else
-        try std.fs.cwd().openFile(in_file_name, .{});
-    defer in_file.close();
+        try std.Io.Dir.cwd().openFile(io, in_file_name, .{});
+    defer in_file.close(io);
 
     var buf: [std.heap.page_size_min]u8 = undefined;
-    while (true) {
-        const bytes_read = try in_file.read(&buf);
-        if (bytes_read == 0) return;
-        try out_file.writeAll(buf[0..bytes_read]);
-    }
+    var rdr = std.Io.File.reader(in_file, io, &buf);
+    _ = try rdr.interface.streamRemaining(stdout);
 }
