@@ -550,10 +550,68 @@ fn list_langs(writer: *Writer) !void {
             }
         }.cmp,
     );
-    for (sorted) |file_type| {
-        try writer.writeAll(file_type.name);
+
+    var max_lang_len: usize = 0;
+    var max_ext_len: usize = 0;
+    var max_desc_len: usize = 0;
+    for (sorted) |ft| {
+        max_lang_len = @max(max_lang_len, ft.name.len);
+        var ext_str_len: usize = 0;
+        var first: bool = true;
+        for (ft.extensions) |ext| {
+            if (first) {
+                first = false;
+            } else {
+                ext_str_len += 2;
+            }
+            ext_str_len += ext.len;
+        }
+        max_ext_len = @max(max_ext_len, ext_str_len);
+        max_desc_len = @max(max_desc_len, ft.description.len);
+    }
+
+    const icon_pad: usize = 3;
+
+    try writer.writeByte(' ');
+    try write_column_value(writer, " ", icon_pad);
+    try write_column_value(writer, "Language", max_lang_len + 1);
+    try write_column_value(writer, "Extensions", max_ext_len + 1);
+    try writer.writeAll("Description\n");
+
+    for (sorted) |ft| {
+        try writer.writeByte(' ');
+        const icon_cp = std.unicode.utf8CountCodepoints(ft.icon) catch 1;
+        if (ft.color != 0xFFFFFF and ft.color != 0x000000) {
+            const r = @as(u8, @intCast(ft.color >> 16 & 0xFF));
+            const g = @as(u8, @intCast(ft.color >> 8 & 0xFF));
+            const b = @as(u8, @intCast(ft.color & 0xFF));
+            try writer.print("\x1b[38;2;{d};{d};{d}m", .{ r, g, b });
+        }
+        try writer.writeAll(ft.icon);
+        try writer.writeAll("\x1b[0m");
+        for (0..icon_pad -| icon_cp) |_| try writer.writeByte(' ');
+        try write_column_value(writer, ft.name, max_lang_len + 1);
+        var ext_first: bool = true;
+        var ext_cur_len: usize = 0;
+        for (ft.extensions) |ext| {
+            if (ext_first) {
+                ext_first = false;
+            } else {
+                try writer.writeAll(", ");
+                ext_cur_len += 2;
+            }
+            try writer.writeAll(ext);
+            ext_cur_len += ext.len;
+        }
+        try write_column_value(writer, "", max_ext_len + 1 -| ext_cur_len);
+        try writer.writeAll(ft.description);
         try writer.writeAll("\n");
     }
+}
+
+fn write_column_value(writer: *Writer, value: []const u8, column_width: usize) !void {
+    try writer.writeAll(value);
+    for (0..column_width - value.len) |_| try writer.writeByte(' ');
 }
 
 fn render_file_type(writer: *Writer, file_type: *const syntax.FileType, theme: *const Theme) !void {
