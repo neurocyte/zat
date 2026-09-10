@@ -4,6 +4,7 @@ pub fn build(b: *std.Build) void {
     const release = b.option(bool, "package_release", "Build all release targets") orelse false;
     const strip = b.option(bool, "strip", "Disable debug information (default: no)");
     const pie = b.option(bool, "pie", "Produce an executable with position independent code (default: none)");
+    const use_llvm = b.option(bool, "use-llvm", "Enable llvm backend (default: none)");
 
     const run_step = b.step("run", "Run the app");
 
@@ -12,6 +13,7 @@ pub fn build(b: *std.Build) void {
         run_step,
         strip,
         pie,
+        use_llvm,
     );
 }
 
@@ -20,6 +22,7 @@ fn build_development(
     run_step: *std.Build.Step,
     strip: ?bool,
     pie: ?bool,
+    use_llvm: ?bool,
 ) void {
     const target = b.standardTargetOptions(.{});
     const optimize = b.standardOptimizeOption(.{});
@@ -32,6 +35,7 @@ fn build_development(
         .{},
         strip orelse false,
         pie,
+        use_llvm,
     );
 }
 
@@ -40,6 +44,7 @@ fn build_release(
     run_step: *std.Build.Step,
     strip: ?bool,
     pie: ?bool,
+    use_llvm: ?bool,
 ) void {
     const targets: []const std.Target.Query = &.{
         .{ .cpu_arch = .x86_64, .os_tag = .linux, .abi = .musl },
@@ -73,6 +78,7 @@ fn build_release(
             .{ .dest_dir = .{ .override = .{ .custom = target_path } } },
             strip orelse true,
             pie,
+            use_llvm,
         );
     }
 }
@@ -85,11 +91,12 @@ pub fn build_exe(
     exe_install_options: std.Build.Step.InstallArtifact.Options,
     strip: bool,
     pie: ?bool,
+    use_llvm: ?bool,
 ) void {
     const clap_dep = b.dependency("clap", .{ .target = target, .optimize = optimize });
     const ansi_term_dep = b.dependency("ansi_term", .{ .target = target, .optimize = optimize });
     const themes_dep = b.dependency("themes", .{});
-    const syntax_dep = b.dependency("syntax", .{ .target = target, .optimize = optimize });
+    const syntax_dep = b.dependency("syntax", .{ .target = target, .optimize = optimize, .@"use-llvm" = use_llvm });
     const cbor_dep = syntax_dep.builder.dependency("cbor", .{
         .target = target,
         .optimize = optimize,
@@ -105,6 +112,7 @@ pub fn build_exe(
         }),
     });
     if (pie) |value| exe.pie = value;
+    exe.use_llvm = use_llvm;
     exe.root_module.addImport("syntax", syntax_dep.module("syntax"));
     exe.root_module.addImport("theme", themes_dep.module("theme"));
     exe.root_module.addImport("themes", themes_dep.module("themes"));
