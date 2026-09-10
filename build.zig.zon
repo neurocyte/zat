@@ -9,12 +9,12 @@
             .hash = "clap-0.11.0-oBajB7foAQC3Iyn4IVCkUdYaOVVng5IZkSncySTjNig1",
         },
         .themes = .{
-            .url = "https://github.com/neurocyte/flow-themes/releases/download/master-9114e2d9ff4e01064ba1da4f780b0c5448b0f0ef/flow-themes.tar.gz",
-            .hash = "N-V-__8AAJZfLAAP6zSuW13nEIrBBHZM9pbeMRwhvQ-8qqx1",
+            .url = "https://github.com/neurocyte/flow-themes/releases/download/master-8149751a9bddbb48294c2787357b78e88efd9cb3/flow-themes.tar.gz",
+            .hash = "flow_themes-0.7.2-_0IuQUxuKwAohOI64jFciImGvYVA2WylUJl1d3ABbx_y",
         },
         .syntax = .{
-            .url = "git+https://github.com/neurocyte/flow-syntax?ref=master#fd10951562892a8f0f507140ada1dda201445cd6",
-            .hash = "flow_syntax-0.7.2-X8jOoZJcAQDG_jcA_FMqGZ98xjrrq7W-GscGocAKzfsM",
+            .url = "git+https://github.com/neurocyte/flow-syntax?ref=zig-0.16#42d51f7f5aebcc4686ef10a7b92aaa4a2788d766",
+            .hash = "flow_syntax-0.7.2-X8jOoR2XAQB8znsXciEch_MMZgMsQTNvxOPLcQwiy5vU",
         },
         .ansi_term = .{
             .url = "https://github.com/ziglibs/ansi-term/archive/c0e6ad093d4f6a9ed4e65d962d1e53b97888f989.tar.gz",

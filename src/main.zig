@@ -1,6 +1,7 @@
 const std = @import("std");
 const clap = @import("clap");
 const syntax = @import("syntax");
+const cbor = @import("cbor");
 const Theme = @import("theme");
 const themes = @import("themes");
 const term = @import("ansi_term");
@@ -275,7 +276,7 @@ fn render_file(
             try ctx.write_styled(text, style);
         }
 
-        fn cb(ctx: *@This(), range: syntax.Range, scope: []const u8, id: u32, idx: usize, _: *const syntax.Node) error{Stop}!void {
+        fn cb(ctx: *@This(), range: syntax.Range, scope: []const u8, id: u32, idx: usize, _: i32, _: u32, _: *const syntax.Node) error{Stop}!void {
             if (idx > 0) return;
 
             if (ctx.last_pos < range.start_byte) {
@@ -317,7 +318,15 @@ fn render_file(
         };
         break :ret null;
     };
-    try parser.render(&ctx, Ctx.cb, range);
+
+    const validator = struct {
+        fn validate(ptr: *Ctx, predicates: cbor.Raw) bool {
+            _ = ptr;
+            return syntax.SimpleNonRegex(void)({}, predicates);
+        }
+    }.validate;
+
+    try parser.render(&ctx, Ctx.cb, validator, range);
     while (ctx.current_line < end_line) {
         if (std.mem.indexOfPos(u8, content, ctx.last_pos, "\n")) |pos| {
             try ctx.writer.writeAll(content[ctx.last_pos .. pos + 1]);
