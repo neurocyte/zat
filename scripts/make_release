@@ -13,7 +13,7 @@ fi
 
 echo building...
 
-./zig build -Dpackage_release --prefix release/build
+zig build -Dpackage_release -Duse-llvm --prefix release/build
 
 cd release/build
 
