@@ -536,7 +536,21 @@ fn write_hex_color(writer: *Writer, color: u24) !void {
 }
 
 fn list_langs(writer: *Writer) !void {
-    for (syntax.FileType.get_all()) |file_type| {
+    const all = syntax.FileType.get_all();
+    const sorted = try std.heap.page_allocator.alloc(syntax.FileType, all.len);
+    defer std.heap.page_allocator.free(sorted);
+    @memcpy(sorted, all);
+    std.mem.sort(
+        syntax.FileType,
+        sorted,
+        {},
+        struct {
+            fn cmp(_: void, a: syntax.FileType, b: syntax.FileType) bool {
+                return std.mem.lessThan(u8, a.name, b.name);
+            }
+        }.cmp,
+    );
+    for (sorted) |file_type| {
         try writer.writeAll(file_type.name);
         try writer.writeAll("\n");
     }
