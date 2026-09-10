@@ -41,6 +41,7 @@ pub fn main(init: std.process.Init) !void {
 
     const a = init.gpa;
     style_cache = StyleCache.init(a);
+    defer style_cache.deinit();
 
     var stderr_buf: [4096]u8 = undefined;
     var stderr_file = std.Io.File.writer(std.Io.File.stderr(), init.io, &stderr_buf);
@@ -82,7 +83,7 @@ pub fn main(init: std.process.Init) !void {
     if (res.args.color == 0) {
         const tty_mode = std.Io.Terminal.Mode.detect(init.io, std.Io.File.stdout(), false, false) catch .no_color;
         if (tty_mode == .no_color)
-            return plain_cat(init.io, stdout, res.positionals[0]);
+            return plain_cat(init.io, stdout, res.positionals.@"0");
     }
 
     const conf, const conf_bufs = config_loader.read_config(init.io, init.environ_map, @import("config.zig"), a);
@@ -120,8 +121,8 @@ pub fn main(init: std.process.Init) !void {
     if (res.args.html != 0)
         try write_html_preamble(stdout, theme.editor);
 
-    if (res.positionals[0].len > 0) {
-        for (res.positionals[0]) |arg| {
+    if (res.positionals.@"0".len > 0) {
+        for (res.positionals.@"0") |arg| {
             const file = if (std.mem.eql(u8, arg, "-"))
                 std.Io.File.stdin()
             else
@@ -175,6 +176,8 @@ pub fn main(init: std.process.Init) !void {
         };
     }
 
+    try stdout_file.flush();
+
     if (res.args.html != 0)
         try write_html_postamble(stdout);
 }
@@ -197,6 +200,13 @@ fn unknown_file_type(name: []const u8) noreturn {
 }
 
 const StyleFn = *const fn (writer: *Writer, style: Theme.Style) Writer.Error!void;
+
+const Highlight = struct {
+    start_byte: usize,
+    end_byte: usize,
+    token: Theme.Token,
+    rank: i64,
+};
 
 fn render_file(
     io: std.Io,
@@ -229,7 +239,9 @@ fn render_file(
     }
 
     const query_cache = try syntax.QueryCache.create(io, a, .{});
+    defer query_cache.deinit();
     const file_type, const parser = get_parser(a, content, file_path, query_cache);
+    defer parser.destroy();
     try parser.refresh_full(content);
     if (show_file_type) {
         try render_file_type(writer, &file_type, theme);
@@ -241,74 +253,28 @@ fn render_file(
     }
 
     const Ctx = struct {
-        writer: @TypeOf(writer),
         content: []const u8,
         theme: *const Theme,
-        last_pos: usize = 0,
-        set_style: StyleFn,
-        unset_style: StyleFn,
+        allocator: std.mem.Allocator,
+        highlights: std.ArrayList(Highlight),
         start_line: usize,
         end_line: usize,
-        highlight_line_start: usize,
-        highlight_line_end: usize,
-        current_line: usize = 1,
 
-        fn write_styled(ctx: *@This(), text: []const u8, style: Theme.Style) !void {
-            if (!(ctx.start_line <= ctx.current_line and ctx.current_line <= ctx.end_line)) return;
-
-            const style_: Theme.Style = if (ctx.highlight_line_start <= ctx.current_line and ctx.current_line <= ctx.highlight_line_end)
-                .{ .fg = style.fg, .bg = ctx.theme.editor_selection.bg }
-            else
-                .{ .fg = style.fg };
-
-            try ctx.set_style(ctx.writer, style_);
-            try ctx.writer.writeAll(text);
-            try ctx.unset_style(ctx.writer, .{ .fg = ctx.theme.editor.fg });
-        }
-
-        fn write_lines_styled(ctx: *@This(), text_: []const u8, style: Theme.Style) !void {
-            var text = text_;
-            while (std.mem.indexOf(u8, text, "\n")) |pos| {
-                try ctx.write_styled(text[0 .. pos + 1], style);
-                ctx.current_line += 1;
-                text = text[pos + 1 ..];
-            }
-            try ctx.write_styled(text, style);
-        }
-
-        fn cb(ctx: *@This(), range: syntax.Range, scope: []const u8, id: u32, idx: usize, _: i32, _: u32, _: *const syntax.Node) error{Stop}!void {
+        fn cb(ctx: *@This(), range: syntax.Range, scope: []const u8, id: u32, idx: usize, priority: i32, pattern_index: u32, _: *const syntax.Node) error{Stop}!void {
             if (idx > 0) return;
+            if (range.start_point.row + 1 < ctx.start_line or range.start_point.row >= ctx.end_line) return;
 
-            if (ctx.last_pos < range.start_byte) {
-                const before_segment = ctx.content[ctx.last_pos..range.start_byte];
-                ctx.write_lines_styled(before_segment, ctx.theme.editor) catch return error.Stop;
-                ctx.last_pos = range.start_byte;
-            }
-
-            if (range.start_byte < ctx.last_pos) return;
-
-            const scope_segment = ctx.content[range.start_byte..range.end_byte];
-            if (style_cache_lookup(ctx.theme, scope, id)) |token| {
-                ctx.write_lines_styled(scope_segment, token.style) catch return error.Stop;
-            } else {
-                ctx.write_lines_styled(scope_segment, ctx.theme.editor) catch return error.Stop;
-            }
-            ctx.last_pos = range.end_byte;
-            if (ctx.current_line >= ctx.end_line)
-                return error.Stop;
+            const token = style_cache_lookup(ctx.theme, scope, id) orelse return;
+            const rank: i64 = (@as(i64, priority) << 32) | @as(i64, pattern_index);
+            ctx.highlights.append(ctx.allocator, .{
+                .start_byte = range.start_byte,
+                .end_byte = range.end_byte,
+                .token = token,
+                .rank = rank,
+            }) catch return error.Stop;
         }
     };
-    var ctx: Ctx = .{
-        .writer = writer,
-        .content = content,
-        .theme = theme,
-        .set_style = set_style,
-        .unset_style = unset_style,
-        .start_line = start_line,
-        .end_line = end_line,
-        .highlight_line_start = highlight_line_start,
-        .highlight_line_end = highlight_line_end,
-    };
+
     const range: ?syntax.Range = ret: {
         if (limit_lines) |_| break :ret .{
             .start_point = .{ .row = @intCast(start_line - 1), .column = 0 },
@@ -319,23 +285,98 @@ fn render_file(
         break :ret null;
     };
 
-    const validator = struct {
-        fn validate(ptr: *Ctx, predicates: cbor.Raw) bool {
-            _ = ptr;
-            return syntax.SimpleNonRegex(void)({}, predicates);
-        }
-    }.validate;
+    var hl_ctx = Ctx{
+        .content = content,
+        .theme = theme,
+        .allocator = a,
+        .highlights = std.ArrayList(Highlight).initCapacity(a, 64) catch return error.OutOfMemory,
+        .start_line = start_line,
+        .end_line = end_line,
+    };
+    defer hl_ctx.highlights.deinit(a);
 
-    try parser.render(&ctx, Ctx.cb, validator, range);
-    while (ctx.current_line < end_line) {
-        if (std.mem.indexOfPos(u8, content, ctx.last_pos, "\n")) |pos| {
-            try ctx.writer.writeAll(content[ctx.last_pos .. pos + 1]);
-            ctx.current_line += 1;
-            ctx.last_pos = pos + 1;
-        } else {
-            try ctx.writer.writeAll(content[ctx.last_pos..]);
-            break;
+    try parser.render(&hl_ctx, Ctx.cb, syntax.SimpleNonRegex(*Ctx), range);
+    const hl_list = hl_ctx.highlights;
+
+    var line_start: usize = 0;
+    var line_num: usize = 1;
+
+    while (line_start < content.len and line_num <= end_line) {
+        const line_len = std.mem.indexOfScalar(u8, content[line_start..], '\n') orelse content.len - line_start;
+        const line_end = line_start + line_len;
+
+        if (line_num >= start_line) {
+            const line_selected = line_num >= highlight_line_start and line_num <= highlight_line_end;
+
+            var line_hl = std.ArrayList(Highlight).initCapacity(a, 16) catch return error.OutOfMemory;
+            defer line_hl.deinit(a);
+
+            // A highlight only needs to *overlap* the line, not start on
+            // it to handle multi-line tokens correctly
+            for (hl_list.items) |hl| {
+                if (hl.start_byte < line_end and hl.end_byte > line_start) {
+                    try line_hl.append(a, hl);
+                }
+            }
+
+            std.sort.heap(Highlight, line_hl.items, {}, struct {
+                fn lessThan(_: void, lhs: Highlight, rhs: Highlight) bool {
+                    return lhs.rank > rhs.rank;
+                }
+            }.lessThan);
+
+            const coverage = a.alloc(usize, line_len) catch {
+                line_start = line_end + 1;
+                line_num += 1;
+                continue;
+            };
+            defer a.free(coverage);
+            @memset(coverage, std.math.maxInt(usize));
+
+            for (line_hl.items, 0..) |hl, hl_idx| {
+                const hl_start = @max(hl.start_byte, line_start) - line_start;
+                const hl_end = @min(hl.end_byte, line_end) - line_start;
+                var i: usize = hl_start;
+                while (i < hl_end) : (i += 1) {
+                    if (coverage[i] == std.math.maxInt(usize)) {
+                        coverage[i] = hl_idx;
+                    }
+                }
+            }
+
+            var i: usize = 0;
+            while (i < line_len) {
+                const cov_idx = coverage[i];
+                const seg_start = i;
+
+                while (i < line_len and coverage[i] == cov_idx) {
+                    i += 1;
+                }
+                const abs_start = seg_start + line_start;
+                const abs_end = i + line_start;
+
+                const style = if (cov_idx == std.math.maxInt(usize))
+                    theme.editor
+                else
+                    line_hl.items[cov_idx].token.style;
+
+                const style_ = if (line_selected)
+                    Theme.Style{ .fg = style.fg, .bg = theme.editor_selection.bg }
+                else
+                    Theme.Style{ .fg = style.fg };
+
+                try set_style(writer, style_);
+                try writer.writeAll(content[abs_start..abs_end]);
+                try unset_style(writer, .{ .fg = theme.editor.fg });
+            }
+
+            if (line_end < content.len) {
+                try writer.writeAll("\n");
+            }
         }
+
+        line_start = line_end + 1;
+        line_num += 1;
     }
 }
 
